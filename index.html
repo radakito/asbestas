@@ -215,6 +215,11 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
 .tertulia-badge.t2 { background:rgba(240,234,216,.08); color:var(--crema-oscura); border:1px solid var(--borde); }
 .tertulia-badge.t3 { background:rgba(136,136,136,.1); color:var(--gris); border:1px solid rgba(136,136,136,.3); }
 .tertulia-pts { font-family:var(--font-display); font-size:18px; font-weight:700; color:var(--crema); margin-left:auto; white-space:nowrap; }
+
+.estreno-badge{display:inline-block;font-family:var(--font-mono);font-size:9px;padding:2px 6px;border-radius:2px;background:rgba(200,56,42,.2);color:var(--rojo);border:1px solid rgba(200,56,42,.4);margin-left:6px;vertical-align:middle;letter-spacing:.05em}
+.dir-genero{font-family:var(--font-mono);font-size:9px;padding:2px 5px;border-radius:2px;margin-left:4px;vertical-align:middle}
+.dir-m{background:rgba(136,136,136,.15);color:var(--gris)}
+.dir-f{background:rgba(200,56,42,.12);color:#d4826a}
 </style>
 </head>
 <body>
@@ -222,7 +227,7 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
 <!-- LOGIN SCREEN -->
 <div id="login-screen" class="login-screen hidden">
   <div class="login-logo">as <span>bestas</span></div>
-  <div class="login-sub">club de cine · temporada 2024–25</div>
+  <div class="login-sub">club de cine · temporada 2025–26</div>
   <div class="login-box">
     <div id="login-paso1">
       <div class="login-step">¿Quién eres?</div>
@@ -539,6 +544,31 @@ function formatDuracion(min){
 function esc(s){ return String(s).replace(/'/g,"&#39;").replace(/"/g,"&quot;"); }
 function miVoto(pelId){ return votos.find(v=>v.pelicula_id===pelId&&v.miembro_id===usuarioActual.id); }
 
+
+// ---- GÉNERO DIRECTOR ----
+const NOMBRES_F=['Sofia','Sofía','Laura','Ana','María','Maria','Elena','Sara','Isabel','Carmen','Julia','Celine','Céline','Jane','Alice','Andrea','Lucrecia','Claudia','Mia','Mía','Lynne','Kathryn','Agnès','Agnes','Chloé','Chloe','Greta','Nora','Naomi','Yorgos','Nicole','Lila','Marielle','Rebecca','Debra','Patty','Niki','Věra','Vera','Dorota','Małgorzata','Małg','Andréa','Valeria','Lina','Paola','Chiara','Giada','Francesca','Haifaa','Waad','Nadine','Maren','Jasmila','Céline','Carla','Penélope','Alba','Iciar','Icíar','Pilar','Gracia','Montxo','Neus','Meritxell'];
+const NOMBRES_M=['Pedro','Alfonso','Bong','Park','Lee','Kim','Wes','Yorgos','Todd','Jordan','Denis','Xavier','Ruben','Ridley','Christopher','Steven','Martin','Quentin','David','James','John','Paul','George','Michael','Robert','Thomas','Richard','Charles','Daniel','Peter','Mark','Andrew','Anthony','Edward','Kenneth','Roger','Alan','Eric','Philip','Jonathan','Sebastian','Oliver','Hugo','Alejandro','Carlos','Miguel','Rafael','Fernando','Luis','Javier','Pablo','Juan','Antonio','Jose','Manuel','Francisco','Sergio','Víctor','Victor','Andrei','Andrei','Akira','Hayao','Satoshi','Wong','Hong','Asghar','Abbas','Jafar','Majid','Hirokazu','Nanni','Paolo','Marco','Luca','Matteo','Federico','Bernardo','Vittorio','Jean','François','Leos','Bruno','Arnaud','Olivier','Laurent','Mathieu','Nicolas','Michel','Roman','Stanley','Billy','Woody','Francis','Brian','Terry','Tim','Guillermo','Alfonso','Iñárritu','Cuarón'];
+
+function inferirGeneroDir(nombre){
+  if(!nombre) return null;
+  const primero=nombre.trim().split(' ')[0];
+  if(NOMBRES_F.some(n=>n.toLowerCase()===primero.toLowerCase())) return 'F';
+  if(NOMBRES_M.some(n=>n.toLowerCase()===primero.toLowerCase())) return 'M';
+  return null;
+}
+
+function badgeGeneroDir(nombre){
+  const g=inferirGeneroDir(nombre);
+  if(!g) return '';
+  return `<span class="dir-genero ${g==='F'?'dir-f':'dir-m'}">${g==='F'?'directora':'director'}</span>`;
+}
+
+
+function estrenoHTML(anio){
+  if(anio===2025||anio===2026) return `<span class="estreno-badge">estreno</span>`;
+  return '';
+}
+
 // ---- ESTA SEMANA ----
 function renderEstaSemana(){
   const el=document.getElementById('esta-semana');
@@ -581,7 +611,7 @@ function renderEstaSemana(){
         return `<div class="historial-item" onclick="abrirDetalle('${p.id}')">
           <div class="historial-num">${num}</div>
           <div>
-            <div class="historial-titulo-item">${p.titulo}</div>
+            <div class="historial-titulo-item">${p.titulo}${estrenoHTML(p.anio)}</div>
             <div class="historial-meta-item">${p.anio?p.anio:''}${p.pais?' · '+p.pais:''}${nc?' · '+nc+'💬':''}</div>
           </div>
           <div class="historial-nota">${m||'—'}<span>${vv2.length} votos</span></div>
@@ -596,7 +626,7 @@ function renderHistorial(){
   if(!peliculas.length){ el.innerHTML=`<div class="empty-state">No hay películas aún.</div>`; return; }
   const ordenadas=[...peliculas].reverse();
   el.innerHTML=`
-    <div class="seccion-titulo">Temporada 2024–25 · ${peliculas.length} película${peliculas.length!==1?'s':''}</div>
+    <div class="seccion-titulo">Temporada 2025–26 · ${peliculas.length} película${peliculas.length!==1?'s':''}</div>
     <div class="historial-lista">
       ${ordenadas.map((p,i)=>{
         const m=mediaP(p.id),vv2=votosP(p.id),nc=comentariosP(p.id).length;
@@ -604,7 +634,7 @@ function renderHistorial(){
         return `<div class="historial-item" onclick="abrirDetalle('${p.id}')">
           <div class="historial-num">${num}</div>
           <div>
-            <div class="historial-titulo-item">${p.titulo}</div>
+            <div class="historial-titulo-item">${p.titulo}${estrenoHTML(p.anio)}</div>
             <div class="historial-meta-item">${p.anio?p.anio:''}${p.pais?' · '+p.pais:''}${p.fecha_sesion?' · '+formatFecha(p.fecha_sesion):''}${nc?' · '+nc+'💬':''}</div>
           </div>
           <div class="historial-nota">${m||'—'}<span>${vv2.length} votos</span></div>
@@ -620,17 +650,53 @@ function renderRanking(){
     .filter(p=>p.media!==null&&p.nVotos>=4)
     .sort((a,b)=>parseFloat(b.media)-parseFloat(a.media));
   if(!pel.length){ el.innerHTML=`<div class="empty-state">Se necesitan al menos 4 votos<br>por película para aparecer en el ranking.</div>`; return; }
+  // Cartel ranking
+  const pelCartel=peliculas.map(p=>{
+    const cv=(window._cartelVotos||[]).filter(v=>v.pelicula_id===p.id);
+    const mc=cv.length>=4?(cv.reduce((a,b)=>a+b.nota,0)/cv.length).toFixed(1):null;
+    return {...p,mediaCartel:mc,nCartelVotos:cv.length};
+  }).filter(p=>p.mediaCartel!==null).sort((a,b)=>parseFloat(b.mediaCartel)-parseFloat(a.mediaCartel));
+
+  // Estrenos ranking
+  const pelEstrenos=pel.filter(p=>p.anio===2025||p.anio===2026);
+
   el.innerHTML=`
-    <div class="seccion-titulo">Ranking · temporada 2024–25</div>
+    <div class="seccion-titulo">Ranking general · temporada 2025–26</div>
     <div class="historial-lista">
       ${pel.map((p,i)=>`
         <div class="ranking-item" onclick="abrirDetalle('${p.id}')">
           <div class="ranking-pos ${i<3?'top':''}">${i+1}</div>
           <div class="ranking-poster">${p.poster_url?`<img src="${p.poster_url}" alt="${esc(p.titulo)}">`:'&nbsp;'}</div>
-          <div><div class="historial-titulo-item">${p.titulo}</div><div class="historial-meta-item">${p.director||''}${p.anio?' · '+p.anio:''}</div></div>
+          <div><div class="historial-titulo-item">${p.titulo}${estrenoHTML(p.anio)}</div><div class="historial-meta-item">${p.director||''}${p.anio?' · '+p.anio:''}</div></div>
           <div class="historial-nota">${p.media}<span>${p.nVotos} votos</span></div>
         </div>`).join('')}
-    </div>`;
+    </div>
+    ${pelEstrenos.length?`
+    <div style="margin-top:32px">
+      <div class="seccion-titulo">Ranking estrenos 2025–26</div>
+      <div class="historial-lista">
+        ${pelEstrenos.map((p,i)=>`
+          <div class="ranking-item" onclick="abrirDetalle('${p.id}')">
+            <div class="ranking-pos ${i<3?'top':''}">${i+1}</div>
+            <div class="ranking-poster">${p.poster_url?`<img src="${p.poster_url}" alt="${esc(p.titulo)}">`:'&nbsp;'}</div>
+            <div><div class="historial-titulo-item">${p.titulo}<span class="estreno-badge">estreno</span></div><div class="historial-meta-item">${p.director||''}${p.anio?' · '+p.anio:''}</div></div>
+            <div class="historial-nota">${p.media}<span>${p.nVotos} votos</span></div>
+          </div>`).join('')}
+      </div>
+    </div>`:''}
+    ${pelCartel.length?`
+    <div style="margin-top:32px">
+      <div class="seccion-titulo">Ranking carteles (★/5)</div>
+      <div class="historial-lista">
+        ${pelCartel.map((p,i)=>`
+          <div class="ranking-item" onclick="abrirDetalle('${p.id}')">
+            <div class="ranking-pos ${i<3?'top':''}">${i+1}</div>
+            <div class="ranking-poster">${p.poster_url?`<img src="${p.poster_url}" alt="${esc(p.titulo)}">`:'&nbsp;'}</div>
+            <div><div class="historial-titulo-item">${p.titulo}</div><div class="historial-meta-item">${p.director||''}</div></div>
+            <div class="historial-nota">${p.mediaCartel}★<span>${p.nCartelVotos} votos</span></div>
+          </div>`).join('')}
+      </div>
+    </div>`:''}`;
 }
 
 // ---- ESTADÍSTICAS ----
@@ -643,9 +709,9 @@ function renderEstadisticas(){
   const mediaTemp=medias.length?(medias.reduce((a,b)=>a+b,0)/medias.length).toFixed(1):'—';
   const mejorNota=medias.length?Math.max(...medias).toFixed(1):'—';
 
-  // Países
+  // País principal (primer país)
   const paises={};
-  peliculas.forEach(p=>{if(p.pais){p.pais.split(',').forEach(x=>{const t=x.trim();if(t)paises[t]=(paises[t]||0)+1;})}});
+  peliculas.forEach(p=>{if(p.pais){const t=p.pais.split(',')[0].trim();if(t)paises[t]=(paises[t]||0)+1;}});
   const paisesOrd=Object.entries(paises).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxP=paisesOrd[0]?.[1]||1;
 
@@ -676,7 +742,7 @@ function renderEstadisticas(){
 
   // Build pelsPorLabel maps for drilldown
   const pelsPais={};
-  peliculas.forEach(p=>{if(p.pais){p.pais.split(',').forEach(x=>{const t=x.trim();if(t){if(!pelsPais[t])pelsPais[t]=[];pelsPais[t].push(p);}});}});
+  peliculas.forEach(p=>{if(p.pais){const t=p.pais.split(',')[0].trim();if(t){if(!pelsPais[t])pelsPais[t]=[];pelsPais[t].push(p);}}});
 
   const pelsDec={};
   peliculas.forEach(p=>{if(p.anio){const d=Math.floor(p.anio/10)*10+'s';if(!pelsDec[d])pelsDec[d]=[];pelsDec[d].push(p);}});
@@ -694,8 +760,17 @@ function renderEstadisticas(){
     }
   });
 
+  // Género director
+  let nDirectoras=0,nDirectores=0,nSinDato=0;
+  peliculas.forEach(p=>{
+    const g=inferirGeneroDir(p.director);
+    if(g==='F') nDirectoras++;
+    else if(g==='M') nDirectores++;
+    else nSinDato++;
+  });
+
   el.innerHTML=`
-    <div class="seccion-titulo">Temporada 2024–25</div>
+    <div class="seccion-titulo">Temporada 2025–26</div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Películas vistas</div><div class="stat-valor">${peliculas.length}</div></div>
       <div class="stat-card"><div class="stat-label">Media temporada</div><div class="stat-valor">${mediaTemp}</div></div>
@@ -703,6 +778,20 @@ function renderEstadisticas(){
       <div class="stat-card"><div class="stat-label">Votos totales</div><div class="stat-valor">${totalVotos}</div></div>
     </div>
     <div style="font-family:var(--font-mono);font-size:10px;color:var(--gris);margin-bottom:20px">Toca cualquier categoría para ver las películas</div>
+    <div style="margin-bottom:24px">
+      <div class="seccion-titulo">Género del director/a (estimado)</div>
+      ${nDirectoras||nDirectores?`
+      <div class="barra-item">
+        <div class="barra-label-row"><span class="barra-label" style="color:#d4826a">Directoras</span><span class="barra-count">${nDirectoras}</span></div>
+        <div class="barra-track"><div class="barra-fill" style="width:${Math.round(nDirectoras/(nDirectoras+nDirectores+nSinDato)*100)}%;background:#d4826a"></div></div>
+      </div>
+      <div class="barra-item">
+        <div class="barra-label-row"><span class="barra-label">Directores</span><span class="barra-count">${nDirectores}</span></div>
+        <div class="barra-track"><div class="barra-fill" style="width:${Math.round(nDirectores/(nDirectoras+nDirectores+nSinDato)*100)}%"></div></div>
+      </div>
+      ${nSinDato?`<div style="font-family:var(--font-mono);font-size:10px;color:var(--gris);margin-top:4px">${nSinDato} sin dato · corregible desde Admin</div>`:''}
+      `:'<div style="font-family:var(--font-mono);font-size:11px;color:var(--gris)">Sin datos aún</div>'}
+    </div>
     ${renderBarras('Por país',paisesOrd,maxP,pelsPais)}
     ${renderBarras('Por década',decadasOrd,maxD,pelsDec)}
     ${renderBarras('Por género',generosOrd,maxG,pelsGen)}
@@ -763,7 +852,7 @@ async function confirmarManual(){
       filmaffinity_url:faManual||null,
       fecha_sesion:fechaSesion,
       numero_sesion:peliculas.length+1,
-      temporada:'2024-25'
+      temporada:'2025-26'
     }});
     cerrarModal('modal-aniadir');
     toast('Película añadida: '+titulo);
@@ -923,7 +1012,7 @@ async function confirmarAniadir(){
     const res=await fetch(`https://api.themoviedb.org/3/movie/${tmdbSel.id}?api_key=${TMDB}&language=es-ES&append_to_response=credits,translations`);
     const d=await res.json();
     const director=d.credits?.crew?.find(c=>c.job==='Director')?.name||'';
-    const paises=d.production_countries?.map(c=>c.name).join(', ')||'';
+    const paises=d.production_countries?.length?d.production_countries[0].name:'';
     const generos=d.genres?.map(g=>g.name).join(', ')||'';
     const anio=d.release_date?parseInt(d.release_date.substring(0,4)):null;
     const posterUrl=d.poster_path?`${TMDB_IMG}${d.poster_path}`:null;
@@ -937,7 +1026,8 @@ async function confirmarAniadir(){
       titulo:d.title,director,anio,pais:paises,genero:generos,
       sinopsis:d.overview||'',poster_url:posterUrl,tmdb_id:d.id,
       filmaffinity_url:faUrl,fecha_sesion:fechaSesion,
-      numero_sesion:peliculas.length+1,temporada:'2024-25',duracion
+      numero_sesion:peliculas.length+1,temporada:'2025-26',duracion,
+      fa_nota:null
     }});
     cerrarModal('modal-aniadir');
     toast('Añadida: '+d.title);
@@ -988,7 +1078,8 @@ function renderAdmin(){
                 <label class="form-label">País</label>
                 <input id="ef-pais-${p.id}" value="${esc(p.pais||'')}">
                 <label class="form-label">Enlace FilmAffinity</label>
-                <input id="ef-fa-${p.id}" value="${esc(p.filmaffinity_url||'')}">
+                <input id="ef-fa-${p.id}" value="${esc(p.filmaffinity_url||'')}"><label class="form-label">Nota FilmAffinity (ej: 6.8)</label>
+                <input id="ef-fanota-${p.id}" type="number" step="0.1" min="1" max="10" value="${p.fa_nota||''}" placeholder="ej: 7.2">
                 <div class="edit-row">
                   <button class="save-btn" onclick="guardarEdicion('${p.id}')">Guardar</button>
                   <button class="cancel-btn" onclick="toggleEditar('edit-${p.id}')">Cancelar</button>
@@ -1012,7 +1103,8 @@ async function guardarEdicion(pelId){
   const pais=document.getElementById('ef-pais-'+pelId).value.trim();
   try{
     const fa=document.getElementById('ef-fa-'+pelId).value.trim();
-    await dbPatch('peliculas',`id=eq.${pelId}`,{titulo,director,fecha_sesion:fecha,pais,filmaffinity_url:fa||null});
+    const faNota=parseFloat(document.getElementById('ef-fanota-'+pelId).value)||null;
+    await dbPatch('peliculas',`id=eq.${pelId}`,{titulo,director,fecha_sesion:fecha,pais,filmaffinity_url:fa||null,fa_nota:faNota});
     toast('Guardado');
     await cargarTodo();
   }catch(e){ toast('Error guardando'); }
@@ -1087,7 +1179,7 @@ function abrirModalCartel(pelId){
   // Check existing vote
   const existing=(window._cartelVotos||[]).find(v=>v.pelicula_id===pelId&&v.miembro_id===usuarioActual.id);
   setCartelStar(existing?existing.nota:0,true);
-  document.getElementById('confirmar-cartel-btn').disabled=!existing;
+  document.getElementById('confirmar-cartel-btn').disabled=cartelStarVal===0;
   document.getElementById('modal-cartel').classList.remove('hidden');
 }
 
@@ -1141,9 +1233,16 @@ function abrirModalTertulia(){
         <div style="font-family:var(--font-mono);font-size:10px;color:var(--gris)">${p.fecha_sesion?formatFecha(p.fecha_sesion):''}</div>
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0">
-        <button onclick="votarTertulia('${p.id}',1)" style="font-family:var(--font-mono);font-size:10px;padding:4px 7px;border-radius:2px;cursor:pointer;border:1px solid ${pos===1?'var(--rojo)':'var(--borde)'};background:${pos===1?'rgba(200,56,42,.15)':'none'};color:${pos===1?'var(--rojo)':'var(--gris)'};${!canVote1&&pos!==1?'opacity:.3;cursor:not-allowed':''}">1ª</button>
-        <button onclick="votarTertulia('${p.id}',2)" style="font-family:var(--font-mono);font-size:10px;padding:4px 7px;border-radius:2px;cursor:pointer;border:1px solid ${pos===2?'var(--rojo)':'var(--borde)'};background:${pos===2?'rgba(200,56,42,.15)':'none'};color:${pos===2?'var(--rojo)':'var(--gris)'};${!canVote2&&pos!==2?'opacity:.3;cursor:not-allowed':''}">2ª</button>
-        <button onclick="votarTertulia('${p.id}',3)" style="font-family:var(--font-mono);font-size:10px;padding:4px 7px;border-radius:2px;cursor:pointer;border:1px solid ${pos===3?'var(--rojo)':'var(--borde)'};background:${pos===3?'rgba(200,56,42,.15)':'none'};color:${pos===3?'var(--rojo)':'var(--gris)'};${!canVote3&&pos!==3?'opacity:.3;cursor:not-allowed':''}">3ª</button>
+        ${[1,2,3].map(n=>{
+          const isMe=pos===n;
+          const ok=n===1?canVote1:n===2?canVote2:canVote3;
+          const label=n===1?'1ª':n===2?'2ª':'3ª';
+          const bc=isMe?'var(--rojo)':'var(--borde)';
+          const bg=isMe?'rgba(200,56,42,.15)':'transparent';
+          const col=isMe?'var(--rojo)':'var(--gris)';
+          const dis=(!ok&&!isMe)?'opacity:.4;pointer-events:none':'cursor:pointer';
+          return `<button onclick="votarTertulia('${p.id}',${n})" style="font-family:var(--font-mono);font-size:10px;padding:4px 7px;border-radius:2px;border:1px solid ${bc};background:${bg};color:${col};${dis}">${label}</button>`;
+        }).join('')}
       </div>
     </div>`;
   }).join('');
