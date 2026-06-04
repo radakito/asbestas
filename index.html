@@ -259,6 +259,7 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
     <button onclick="mostrarSeccion('ranking',this)">Ranking</button>
     <button onclick="mostrarSeccion('estadisticas',this)">Estadísticas</button>
     <button onclick="mostrarSeccion('tertulias',this)">Tertulias</button>
+    <button onclick="mostrarSeccion('carteles',this)">Carteles</button>
     <button id="nav-admin" onclick="mostrarSeccion('admin',this)" class="hidden">Admin</button>
   </nav>
   <main class="main">
@@ -267,6 +268,7 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
     <section id="ranking" class="hidden"><div class="loader">Cargando...</div></section>
     <section id="estadisticas" class="hidden"><div class="loader">Cargando...</div></section>
     <section id="tertulias" class="hidden"><div class="loader">Cargando...</div></section>
+    <section id="carteles" class="hidden"><div class="loader">Cargando...</div></section>
     <section id="admin" class="hidden"><div class="loader">Cargando...</div></section>
   </main>
   <button class="fab hidden" id="fab-añadir" onclick="abrirModalAniadir()" title="Añadir película">+</button>
@@ -322,36 +324,8 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
 </div>
 
 
-<!-- MODAL VOTAR CARTEL -->
-<div class="modal-overlay hidden" id="modal-cartel" onclick="if(event.target===this)cerrarModal('modal-cartel')">
-  <div class="modal">
-    <div class="modal-titulo" id="mc-titulo">Valorar cartel</div>
-    <div class="modal-subtitulo" id="mc-subtitulo"></div>
-    <div style="text-align:center;margin:20px 0">
-      <img id="mc-poster" src="" style="width:120px;border-radius:3px;display:none">
-    </div>
-    <label class="form-label">Tu valoración del cartel (1–5)</label>
-    <div class="cartel-stars" id="cartel-stars" style="justify-content:center;font-size:28px;margin:16px 0">
-      <span class="cartel-star" onclick="setCartelStar(1);event.stopPropagation()">★</span>
-      <span class="cartel-star" onclick="setCartelStar(2);event.stopPropagation()">★</span>
-      <span class="cartel-star" onclick="setCartelStar(3);event.stopPropagation()">★</span>
-      <span class="cartel-star" onclick="setCartelStar(4);event.stopPropagation()">★</span>
-      <span class="cartel-star" onclick="setCartelStar(5);event.stopPropagation()">★</span>
-    </div>
-    <button class="confirmar-btn" id="confirmar-cartel-btn" disabled onclick="confirmarCartel()">Guardar valoración</button>
-    <button class="cancelar-btn" onclick="cerrarModal('modal-cartel')">Cancelar</button>
-  </div>
-</div>
 
-<!-- MODAL TERTULIA -->
-<div class="modal-overlay hidden" id="modal-tertulia" onclick="if(event.target===this)cerrarModal('modal-tertulia')">
-  <div class="modal">
-    <div class="modal-titulo">Mis tertulias favoritas</div>
-    <div class="modal-subtitulo" id="mt-subtitulo">Elige tu 1ª, 2ª y 3ª tertulia favorita de la temporada</div>
-    <div id="mt-content"></div>
-    <button class="cancelar-btn" onclick="cerrarModal('modal-tertulia')">Cerrar</button>
-  </div>
-</div>
+
 
 <div class="toast" id="toast"></div>
 
@@ -518,6 +492,7 @@ async function cargarTodo(){
     renderRanking();
     renderEstadisticas();
     renderTertulias();
+    renderCarteles();
     if(ADMINS.includes(usuarioActual.nombre)) renderAdmin();
   }catch(e){ toast('Error: '+e.message); }
 }
@@ -564,6 +539,13 @@ function badgeGeneroDir(nombre){
 }
 
 
+
+function paisPrincipal(p){
+  if(!p.pais) return null;
+  // Take first country only, handle both "Colombia" and "Colombia, France"
+  return p.pais.split(',')[0].split('/')[0].trim();
+}
+
 function estrenoHTML(anio){
   if(anio===2025||anio===2026) return `<span class="estreno-badge">estreno</span>`;
   return '';
@@ -599,7 +581,6 @@ function renderEstaSemana(){
           ${yaVote
             ?`<div class="ya-votaste">Tu nota: ${yaVote.nota}/10</div>`
             :`<button class="votar-btn" onclick="abrirModalVotar('${peli.id}')">Votar esta película</button>`}
-          <button class="btn-secundario" style="margin-top:8px" onclick="abrirModalCartel('${peli.id}')">★ Valorar cartel</button>
         </div>
       </div>
     </div>
@@ -709,9 +690,9 @@ function renderEstadisticas(){
   const mediaTemp=medias.length?(medias.reduce((a,b)=>a+b,0)/medias.length).toFixed(1):'—';
   const mejorNota=medias.length?Math.max(...medias).toFixed(1):'—';
 
-  // País principal (primer país)
+  // País principal
   const paises={};
-  peliculas.forEach(p=>{if(p.pais){const t=p.pais.split(',')[0].trim();if(t)paises[t]=(paises[t]||0)+1;}});
+  peliculas.forEach(p=>{const t=paisPrincipal(p);if(t)paises[t]=(paises[t]||0)+1;});
   const paisesOrd=Object.entries(paises).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxP=paisesOrd[0]?.[1]||1;
 
@@ -742,7 +723,7 @@ function renderEstadisticas(){
 
   // Build pelsPorLabel maps for drilldown
   const pelsPais={};
-  peliculas.forEach(p=>{if(p.pais){const t=p.pais.split(',')[0].trim();if(t){if(!pelsPais[t])pelsPais[t]=[];pelsPais[t].push(p);}}});
+  peliculas.forEach(p=>{const t=paisPrincipal(p);if(t){if(!pelsPais[t])pelsPais[t]=[];pelsPais[t].push(p);}});
 
   const pelsDec={};
   peliculas.forEach(p=>{if(p.anio){const d=Math.floor(p.anio/10)*10+'s';if(!pelsDec[d])pelsDec[d]=[];pelsDec[d].push(p);}});
@@ -903,15 +884,6 @@ async function abrirDetalle(pelId){
     ${yaVote
       ?`<div class="ya-votaste" style="text-align:center;padding:12px 0">Tu nota: <strong style="color:var(--crema)">${yaVote.nota}/10</strong></div>`
       :`<button class="votar-btn" style="width:100%;text-align:center;margin-bottom:8px" onclick="cerrarModal('modal-detalle');abrirModalVotar('${p.id}')">Votar esta película</button>`}
-    ${(()=>{
-      const miVotoCartel=(window._cartelVotos||[]).find(v=>v.pelicula_id===pelId&&v.miembro_id===usuarioActual.id);
-      const mediaC=mediaCartel(pelId);
-      const estrellas=miVotoCartel?'★'.repeat(miVotoCartel.nota)+'☆'.repeat(5-miVotoCartel.nota):'☆☆☆☆☆';
-      return `<button class="btn-secundario" style="margin-bottom:8px" onclick="abrirModalCartel('${pelId}')">
-        ${miVotoCartel?'★ Cartel valorado: '+estrellas:'★ Valorar cartel'}${mediaC?' · media '+mediaC:''}
-      </button>`;
-    })()}
-    <button class="btn-secundario" style="margin-bottom:8px" onclick="cerrarModal('modal-detalle');abrirModalTertulia()">♟ Mis tertulias favoritas</button>
     <hr class="divider">
     <div class="comentarios-seccion">
       <div class="seccion-titulo">Comentarios (${coms.length})</div>
@@ -1178,144 +1150,21 @@ function cerrarSiOverlay(e,id){ if(e.target.id===id) cerrarModal(id); }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('visible'); setTimeout(()=>t.classList.remove('visible'),3000); }
 
 
-// ---- CARTEL ----
-let cartelPelId=null, cartelStarVal=0;
+// CARTEL: replaced by points system in Carteles section
 
-function abrirModalCartel(pelId){
-  const p=peliculas.find(x=>x.id===pelId);
-  if(!p) return;
-  cartelPelId=pelId; cartelStarVal=0;
-  document.getElementById('mc-titulo').textContent='Valorar cartel · '+p.titulo;
-  document.getElementById('mc-subtitulo').textContent=p.anio?p.anio:'';
-  const img=document.getElementById('mc-poster');
-  if(p.poster_url){img.src=p.poster_url;img.style.display='block';}
-  else img.style.display='none';
-  // Check existing vote
-  const existing=(window._cartelVotos||[]).find(v=>v.pelicula_id===pelId&&v.miembro_id===usuarioActual.id);
-  cartelStarVal=existing?existing.nota:0;
-  setCartelStar(cartelStarVal,true);
-  document.getElementById('confirmar-cartel-btn').disabled=cartelStarVal===0;
-  document.getElementById('modal-cartel').classList.remove('hidden');
-}
+// ---- TERTULIAS & CARTELES SHARED LOGIC ----
+// Both use same 3-2-1 points system stored in tertulia_votos and cartel_votos
+// posicion: 1=3pts, 2=2pts, 3=1pt
 
-function setCartelStar(n, init=false){
-  cartelStarVal=n;
-  document.querySelectorAll('.cartel-star').forEach((s,i)=>{
-    s.classList.toggle('active',i<n);
-  });
-  if(!init) document.getElementById('confirmar-cartel-btn').disabled=n===0;
-}
-
-async function confirmarCartel(){
-  if(!cartelPelId||!cartelStarVal) return;
-  const btn=document.getElementById('confirmar-cartel-btn');
-  btn.disabled=true; btn.textContent='Guardando...';
-  try{
-    // Upsert: delete existing then insert
-    await fetch(`${SB_URL}/rest/v1/cartel_votos?pelicula_id=eq.${cartelPelId}&miembro_id=eq.${usuarioActual.id}`,{
-      method:'DELETE',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
-    });
-    await db('cartel_votos',{method:'POST',body:{pelicula_id:cartelPelId,miembro_id:usuarioActual.id,nota:cartelStarVal}});
-    cerrarModal('modal-cartel');
-    toast('Cartel valorado: '+cartelStarVal+'/5');
-    await cargarTodo();
-  }catch(e){ toast('Error: '+e.message); btn.disabled=false; btn.textContent='Guardar valoración'; }
-}
-
-function mediaCartel(pelId){
-  const vv=(window._cartelVotos||[]).filter(v=>v.pelicula_id===pelId);
-  if(vv.length<4) return null;
-  return (vv.reduce((a,b)=>a+b.nota,0)/vv.length).toFixed(1);
-}
-
-// ---- TERTULIAS ----
-function abrirModalTertulia(){
-  const myVotes=(window._tertuliaVotos||[]).filter(v=>v.miembro_id===usuarioActual.id);
+function renderVotacionSection(tipo, storageKey, sectionEl){
+  const myVotes=(window[storageKey]||[]).filter(v=>v.miembro_id===usuarioActual.id);
   const pos1=myVotes.find(v=>v.posicion===1);
   const pos2=myVotes.find(v=>v.posicion===2);
   const pos3=myVotes.find(v=>v.posicion===3);
 
-  // Build tertulia list using DOM to avoid template literal issues
-  const container=document.createElement('div');
-  container.style.cssText='max-height:60vh;overflow-y:auto';
-
-  peliculas.forEach(p=>{
-    const myVote=myVotes.find(v=>v.pelicula_id===p.id);
-    const pos=myVote?myVote.posicion:0;
-    const canVote1=!pos1||pos===1;
-    const canVote2=!pos2||pos===2;
-    const canVote3=!pos3||pos===3;
-
-    const row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(240,234,216,.15)';
-
-    const info=document.createElement('div');
-    info.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:13px;color:#f0ead8">${p.titulo}</div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888">${p.fecha_sesion?formatFecha(p.fecha_sesion):''}</div>`;
-
-    const btns=document.createElement('div');
-    btns.style.cssText='display:flex;gap:5px;flex-shrink:0';
-
-    [1,2,3].forEach(n=>{
-      const isMe=pos===n;
-      const ok=n===1?canVote1:n===2?canVote2:canVote3;
-      const label=n===1?'1ª':n===2?'2ª':'3ª';
-      const btn=document.createElement('button');
-      btn.textContent=label;
-      btn.style.cssText=`font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 7px;border-radius:2px;border:1px solid ${isMe?'#c8382a':'rgba(240,234,216,.15)'};background:${isMe?'rgba(200,56,42,.15)':'transparent'};color:${isMe?'#c8382a':'#888'};${(!ok&&!isMe)?'opacity:.4;pointer-events:none':'cursor:pointer'}`;
-      btn.addEventListener('click',()=>votarTertulia(p.id,n));
-      btns.appendChild(btn);
-    });
-
-    row.appendChild(info);
-    row.appendChild(btns);
-    container.appendChild(row);
-  });
-
-  document.getElementById('mt-content').innerHTML='';
-  document.getElementById('mt-content').appendChild(container);
-  document.getElementById('modal-tertulia').classList.remove('hidden');
-}
-
-async function votarTertulia(pelId, posicion){
-  const myVotes=(window._tertuliaVotos||[]).filter(v=>v.miembro_id===usuarioActual.id);
-  const existing=myVotes.find(v=>v.pelicula_id===pelId&&v.posicion===posicion);
-  const posOcupada=myVotes.find(v=>v.posicion===posicion&&v.pelicula_id!==pelId);
-
-  // Toggle off
-  if(existing){
-    await fetch(`${SB_URL}/rest/v1/tertulia_votos?id=eq.${existing.id}`,{
-      method:'DELETE',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
-    });
-    await cargarTodo();
-    abrirModalTertulia();
-    return;
-  }
-  // Position already taken by another peli
-  if(posOcupada){ toast('Ya tienes una '+posicion+'ª tertulia asignada'); return; }
-  // Remove any other position this peli had
-  const otraPos=myVotes.find(v=>v.pelicula_id===pelId);
-  if(otraPos){
-    await fetch(`${SB_URL}/rest/v1/tertulia_votos?id=eq.${otraPos.id}`,{
-      method:'DELETE',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
-    });
-  }
-  await db('tertulia_votos',{method:'POST',body:{pelicula_id:pelId,miembro_id:usuarioActual.id,posicion}});
-  await cargarTodo();
-  abrirModalTertulia();
-}
-
-// ---- RENDER TERTULIAS ----
-function renderTertulias(){
-  const el=document.getElementById('tertulias');
-  const tv=window._tertuliaVotos||[];
-  if(!tv.length){ el.innerHTML=`
-    <div style="margin-bottom:16px"><button class="votar-btn" onclick="abrirModalTertulia()">Votar mis tertulias favoritas</button></div>
-    <div class="empty-state">Nadie ha votado sus tertulias aún.</div>`; return; }
-
-  // Calculate points: 1st=3, 2nd=2, 3rd=1
+  const allVotes=window[storageKey]||[];
   const pts={};
-  tv.forEach(v=>{
+  allVotes.forEach(v=>{
     if(!pts[v.pelicula_id]) pts[v.pelicula_id]={p:0,v1:0,v2:0,v3:0};
     const puntos=v.posicion===1?3:v.posicion===2?2:1;
     pts[v.pelicula_id].p+=puntos;
@@ -1325,22 +1174,141 @@ function renderTertulias(){
   });
   const ranking=peliculas.filter(p=>pts[p.id]).map(p=>({...p,...pts[p.id]})).sort((a,b)=>b.p-a.p);
 
-  el.innerHTML=`
-    <div style="margin-bottom:20px"><button class="votar-btn" onclick="abrirModalTertulia()">✎ Mis tertulias favoritas</button></div>
-    <div class="seccion-titulo">Ranking de tertulias · ${tv.length} votos</div>
-    <div class="historial-lista">
-      ${ranking.map((p,i)=>`
-        <div class="tertulia-ranking-item">
-          <div style="font-family:var(--font-mono);font-size:12px;color:${i<3?'var(--rojo)':'var(--gris)'};width:20px;text-align:right">${i+1}</div>
-          <div style="flex:1">
-            <div style="font-family:var(--font-display);font-size:15px;color:var(--crema)">${p.titulo}</div>
-            <div style="font-family:var(--font-mono);font-size:10px;color:var(--gris);margin-top:2px">
-              ${p.v1?`<span style="color:var(--rojo)">${p.v1}×1ª</span> `:''}${p.v2?`${p.v2}×2ª `:''}${p.v3?`${p.v3}×3ª`:''}
-            </div>
+  const label=tipo==='tertulia'?'tertulia':'cartel';
+  const Label=tipo==='tertulia'?'Tertulia':'Cartel';
+
+  // Build DOM
+  sectionEl.innerHTML='';
+
+  // My votes header
+  const myHeader=document.createElement('div');
+  myHeader.className='seccion-titulo';
+  myHeader.textContent='Mis '+label+'s favoritos';
+  sectionEl.appendChild(myHeader);
+
+  const myInfo=document.createElement('div');
+  myInfo.style.cssText='font-family:var(--font-mono);font-size:11px;color:var(--gris);margin-bottom:16px';
+  myInfo.textContent='Elige 3 y asígnales 3, 2 y 1 punto. Toca para asignar o quitar.';
+  sectionEl.appendChild(myInfo);
+
+  // Películas list for voting
+  const pelList=document.createElement('div');
+  pelList.style.cssText='margin-bottom:32px';
+
+  peliculas.forEach(p=>{
+    const myVote=myVotes.find(v=>v.pelicula_id===p.id);
+    const pos=myVote?myVote.posicion:0;
+
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(240,234,216,.12);gap:12px';
+
+    // Poster + title
+    const info=document.createElement('div');
+    info.style.cssText='display:flex;align-items:center;gap:10px;flex:1;min-width:0';
+    if(p.poster_url){
+      const img=document.createElement('img');
+      img.src=p.poster_url;
+      img.style.cssText='width:32px;height:48px;object-fit:cover;border-radius:2px;flex-shrink:0';
+      info.appendChild(img);
+    }
+    const txt=document.createElement('div');
+    txt.style.cssText='min-width:0';
+    txt.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:13px;color:#f0ead8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.titulo}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888">${p.anio||''}${p.fecha_sesion?' · '+formatFecha(p.fecha_sesion):''}</div>`;
+    info.appendChild(txt);
+    row.appendChild(info);
+
+    // 3 point buttons
+    const btns=document.createElement('div');
+    btns.style.cssText='display:flex;gap:4px;flex-shrink:0';
+
+    [1,2,3].forEach(n=>{
+      const isMe=pos===n;
+      const posOcupada=n===1?pos1:n===2?pos2:pos3;
+      const disponible=!posOcupada||isMe;
+      const puntos=n===1?3:n===2?2:1;
+
+      const btn=document.createElement('button');
+      btn.textContent=puntos+'pts';
+      btn.style.cssText=`font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;padding:5px 9px;border-radius:2px;transition:all .15s;
+        border:1px solid ${isMe?'#c8382a':'rgba(240,234,216,.2)'};
+        background:${isMe?'rgba(200,56,42,.2)':'transparent'};
+        color:${isMe?'#c8382a':disponible?'#d9d0b8':'#555'};
+        cursor:${disponible?'pointer':'not-allowed'};
+        opacity:${disponible?'1':'.4'}`;
+
+      if(disponible){
+        btn.addEventListener('click', async ()=>{
+          if(isMe){
+            // Remove vote
+            await fetch(`${SB_URL}/rest/v1/${tipo==='tertulia'?'tertulia_votos':'cartel_votos'}?id=eq.${myVote.id}`,{
+              method:'DELETE',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+            });
+          } else {
+            // Remove existing vote for this peli if any
+            const existing=myVotes.find(v=>v.pelicula_id===p.id);
+            if(existing){
+              await fetch(`${SB_URL}/rest/v1/${tipo==='tertulia'?'tertulia_votos':'cartel_votos'}?id=eq.${existing.id}`,{
+                method:'DELETE',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+              });
+            }
+            // Add new vote
+            await db(tipo==='tertulia'?'tertulia_votos':'cartel_votos',{
+              method:'POST',
+              body:{pelicula_id:p.id,miembro_id:usuarioActual.id,posicion:n}
+            });
+          }
+          await cargarTodo();
+        });
+      }
+      btns.appendChild(btn);
+    });
+    row.appendChild(btns);
+    pelList.appendChild(row);
+  });
+  sectionEl.appendChild(pelList);
+
+  // Ranking
+  if(ranking.length){
+    const rankHeader=document.createElement('div');
+    rankHeader.className='seccion-titulo';
+    rankHeader.textContent='Ranking de '+label+'s · '+allVotes.length+' votos';
+    sectionEl.appendChild(rankHeader);
+
+    const rankList=document.createElement('div');
+    ranking.forEach((p,i)=>{
+      const item=document.createElement('div');
+      item.style.cssText='display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(240,234,216,.12);cursor:pointer';
+      item.addEventListener('click',()=>abrirDetalle(p.id));
+      item.innerHTML=`
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:${i<3?'#c8382a':'#888'};width:20px;text-align:right;flex-shrink:0">${i+1}</div>
+        ${p.poster_url?`<img src="${p.poster_url}" style="width:36px;height:54px;object-fit:cover;border-radius:2px;flex-shrink:0">`:'<div style="width:36px;height:54px;background:#333;border-radius:2px;flex-shrink:0"></div>'}
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Playfair Display',serif;font-size:14px;color:#f0ead8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.titulo}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888;margin-top:2px">
+            ${p.v1?`<span style="color:#c8382a">${p.v1}×3pts</span> `:''}${p.v2?`${p.v2}×2pts `:''}${p.v3?`${p.v3}×1pt`:''}
           </div>
-          <div class="tertulia-pts">${p.p}pts</div>
-        </div>`).join('')}
-    </div>`;
+        </div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#f0ead8;flex-shrink:0">${p.p}pts</div>`;
+      rankList.appendChild(item);
+    });
+    sectionEl.appendChild(rankList);
+  } else {
+    const empty=document.createElement('div');
+    empty.className='empty-state';
+    empty.textContent='Nadie ha votado sus '+label+'s favoritos aún.';
+    sectionEl.appendChild(empty);
+  }
+}
+
+function renderTertulias(){
+  const el=document.getElementById('tertulias');
+  renderVotacionSection('tertulia','_tertuliaVotos',el);
+}
+
+function renderCarteles(){
+  const el=document.getElementById('carteles');
+  renderVotacionSection('cartel','_cartelVotos',el);
 }
 
 // ---- ARRANQUE ----
