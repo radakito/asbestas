@@ -262,6 +262,8 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
     <div class="search-results" id="search-results"></div>
     <label class="form-label">Fecha de sesión</label>
     <input class="date-input" type="date" id="fecha-sesion">
+    <label class="form-label">Enlace FilmAffinity (opcional)</label>
+    <input class="txt-input" id="fa-url" placeholder="https://www.filmaffinity.com/es/film..." style="margin-bottom:16px">
     <button class="confirmar-btn" id="confirmar-aniadir-btn" disabled onclick="confirmarAniadir()">Añadir al club</button>
     <button class="cancelar-btn" onclick="cerrarModal('modal-aniadir')">Cancelar</button>
   </div>
@@ -423,7 +425,7 @@ async function cargarTodo(){
   try{
     [miembros,peliculas,votos,comentarios]=await Promise.all([
       db('miembros',{filter:'activo=eq.true',order:'nombre.asc'}),
-      db('peliculas',{order:'fecha_sesion.desc.nullslast,creado_en.desc'}),
+      db('peliculas',{order:'fecha_sesion.asc.nullslast,creado_en.asc'}),
       db('votos',{select:'*'}),
       db('comentarios',{select:'*',order:'creado_en.asc'}).catch(()=>[])
     ]);
@@ -460,7 +462,7 @@ function miVoto(pelId){ return votos.find(v=>v.pelicula_id===pelId&&v.miembro_id
 // ---- ESTA SEMANA ----
 function renderEstaSemana(){
   const el=document.getElementById('esta-semana');
-  const peli=peliculas[0]||null;
+  const peli=peliculas.length?peliculas[peliculas.length-1]:null;
   if(!peli){ el.innerHTML=`<div class="empty-state">No hay película esta semana.<br>Añádela desde Admin.</div>`; return; }
 
   const vv=votosP(peli.id);
@@ -478,12 +480,12 @@ function renderEstaSemana(){
           <div class="peli-titulo">${peli.titulo}</div>
           <div class="peli-meta">
             ${peli.director?peli.director+'<br>':''}
-            ${peli.anio||''}${peli.pais?' · '+peli.pais:''}${dur?' · '+dur:''}<br>
+            ${peli.anio?peli.anio:''}${peli.pais?' · '+peli.pais:''}${dur?' · '+dur:''}<br>
             ${faLink}
           </div>
         </div>
         <div>
-          <div class="votos-estado">${vv.length} voto${vv.length!==1?'s':''} · media: <strong style="color:var(--crema)">${media||'—'}</strong></div>
+          <div class="votos-estado">${vv.length} voto${vv.length!==1?'s':''} · media: <strong style="color:var(--crema)">${media||'—'}</strong>${comentariosP(peli.id).length?' · '+comentariosP(peli.id).length+'💬':''}</div>
           ${yaVote
             ?`<div class="ya-votaste">Tu nota: ${yaVote.nota}/10</div>`
             :`<button class="votar-btn" onclick="abrirModalVotar('${peli.id}')">Votar esta película</button>`}
@@ -492,11 +494,15 @@ function renderEstaSemana(){
     </div>
     <div class="seccion-titulo">Últimas sesiones</div>
     <div class="historial-lista">
-      ${peliculas.slice(1,5).map((p,i)=>{
-        const m=mediaP(p.id),vv2=votosP(p.id);
+      ${[...peliculas].reverse().slice(1,5).map((p)=>{
+        const m=mediaP(p.id),vv2=votosP(p.id),nc=comentariosP(p.id).length;
+        const num=peliculas.indexOf(p)+1;
         return `<div class="historial-item" onclick="abrirDetalle('${p.id}')">
-          <div class="historial-num">${peliculas.length-1-i}</div>
-          <div><div class="historial-titulo-item">${p.titulo}</div><div class="historial-meta-item">${p.director||''}${p.anio?' · '+p.anio:''}${p.pais?' · '+p.pais:''}</div></div>
+          <div class="historial-num">${num}</div>
+          <div>
+            <div class="historial-titulo-item">${p.titulo}</div>
+            <div class="historial-meta-item">${p.anio?p.anio:''}${p.pais?' · '+p.pais:''}${nc?' · '+nc+'💬':''}</div>
+          </div>
           <div class="historial-nota">${m||'—'}<span>${vv2.length} votos</span></div>
         </div>`;
       }).join('')}
@@ -507,14 +513,19 @@ function renderEstaSemana(){
 function renderHistorial(){
   const el=document.getElementById('historial');
   if(!peliculas.length){ el.innerHTML=`<div class="empty-state">No hay películas aún.</div>`; return; }
+  const ordenadas=[...peliculas].reverse();
   el.innerHTML=`
     <div class="seccion-titulo">Temporada 2024–25 · ${peliculas.length} película${peliculas.length!==1?'s':''}</div>
     <div class="historial-lista">
-      ${peliculas.map((p,i)=>{
-        const m=mediaP(p.id),vv2=votosP(p.id);
+      ${ordenadas.map((p,i)=>{
+        const m=mediaP(p.id),vv2=votosP(p.id),nc=comentariosP(p.id).length;
+        const num=peliculas.indexOf(p)+1;
         return `<div class="historial-item" onclick="abrirDetalle('${p.id}')">
-          <div class="historial-num">${peliculas.length-i}</div>
-          <div><div class="historial-titulo-item">${p.titulo}</div><div class="historial-meta-item">${p.director||''}${p.anio?' · '+p.anio:''}${p.pais?' · '+p.pais:''}</div></div>
+          <div class="historial-num">${num}</div>
+          <div>
+            <div class="historial-titulo-item">${p.titulo}</div>
+            <div class="historial-meta-item">${p.anio?p.anio:''}${p.pais?' · '+p.pais:''}${p.fecha_sesion?' · '+formatFecha(p.fecha_sesion):''}${nc?' · '+nc+'💬':''}</div>
+          </div>
           <div class="historial-nota">${m||'—'}<span>${vv2.length} votos</span></div>
         </div>`;
       }).join('')}
@@ -580,7 +591,7 @@ function renderEstadisticas(){
     }
   });
   const durOrd=Object.entries(durBuckets).filter(([,n])=>n>0);
-  const maxDur=durOrd[0]?[Math.max(...durOrd.map(x=>x[1]))]:1;
+  const maxDur=durOrd.length?Math.max(...durOrd.map(x=>x[1])):1;
 
   el.innerHTML=`
     <div class="seccion-titulo">Temporada 2024–25</div>
@@ -743,7 +754,7 @@ async function confirmarAniadir(){
   const btn=document.getElementById('confirmar-aniadir-btn');
   btn.disabled=true; btn.textContent='Buscando detalles...';
   try{
-    const res=await fetch(`https://api.themoviedb.org/3/movie/${tmdbSel.id}?api_key=${TMDB}&language=es-ES&append_to_response=credits`);
+    const res=await fetch(`https://api.themoviedb.org/3/movie/${tmdbSel.id}?api_key=${TMDB}&language=es-ES&append_to_response=credits,translations`);
     const d=await res.json();
     const director=d.credits?.crew?.find(c=>c.job==='Director')?.name||'';
     const paises=d.production_countries?.map(c=>c.name).join(', ')||'';
@@ -753,8 +764,8 @@ async function confirmarAniadir(){
     const duracion=d.runtime||null;
     const fechaSesion=document.getElementById('fecha-sesion').value||null;
 
-    // Buscar FilmAffinity por título + año
-    const faUrl=`https://www.filmaffinity.com/es/search.php?stype=title&stext=${encodeURIComponent(d.title)}`;
+    const faManual=document.getElementById('fa-url').value.trim();
+    const faUrl=faManual||`https://www.filmaffinity.com/es/search.php?stype=title&stext=${encodeURIComponent(d.title)}`;
 
     await db('peliculas',{method:'POST',body:{
       titulo:d.title,director,anio,pais:paises,genero:generos,
@@ -810,6 +821,8 @@ function renderAdmin(){
                 <input type="date" id="ef-fecha-${p.id}" value="${p.fecha_sesion||''}">
                 <label class="form-label">País</label>
                 <input id="ef-pais-${p.id}" value="${esc(p.pais||'')}">
+                <label class="form-label">Enlace FilmAffinity</label>
+                <input id="ef-fa-${p.id}" value="${esc(p.filmaffinity_url||'')}">
                 <div class="edit-row">
                   <button class="save-btn" onclick="guardarEdicion('${p.id}')">Guardar</button>
                   <button class="cancel-btn" onclick="toggleEditar('edit-${p.id}')">Cancelar</button>
@@ -832,7 +845,8 @@ async function guardarEdicion(pelId){
   const fecha=document.getElementById('ef-fecha-'+pelId).value||null;
   const pais=document.getElementById('ef-pais-'+pelId).value.trim();
   try{
-    await dbPatch('peliculas',`id=eq.${pelId}`,{titulo,director,fecha_sesion:fecha,pais});
+    const fa=document.getElementById('ef-fa-'+pelId).value.trim();
+    await dbPatch('peliculas',`id=eq.${pelId}`,{titulo,director,fecha_sesion:fecha,pais,filmaffinity_url:fa||null});
     toast('Guardado');
     await cargarTodo();
   }catch(e){ toast('Error guardando'); }
