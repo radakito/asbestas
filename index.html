@@ -813,7 +813,16 @@ async function abrirDetalle(pelId){
     ${media?`<div class="detalle-media"><div class="detalle-media-num">${media}</div><div class="detalle-media-label">${vv.length} votos · media del grupo</div></div>`:''}
     ${yaVote
       ?`<div class="ya-votaste" style="text-align:center;padding:12px 0">Tu nota: <strong style="color:var(--crema)">${yaVote.nota}/10</strong></div>`
-      :`<button class="votar-btn" style="width:100%;text-align:center;margin-bottom:16px" onclick="cerrarModal('modal-detalle');abrirModalVotar('${p.id}')">Votar esta película</button>`}
+      :`<button class="votar-btn" style="width:100%;text-align:center;margin-bottom:8px" onclick="cerrarModal('modal-detalle');abrirModalVotar('${p.id}')">Votar esta película</button>`}
+    ${(()=>{
+      const miVotoCartel=(window._cartelVotos||[]).find(v=>v.pelicula_id===pelId&&v.miembro_id===usuarioActual.id);
+      const mediaC=mediaCartel(pelId);
+      const estrellas=miVotoCartel?'★'.repeat(miVotoCartel.nota)+'☆'.repeat(5-miVotoCartel.nota):'☆☆☆☆☆';
+      return `<button class="btn-secundario" style="margin-bottom:8px" onclick="abrirModalCartel('${pelId}')">
+        ${miVotoCartel?'★ Cartel valorado: '+estrellas:'★ Valorar cartel'}${mediaC?' · media '+mediaC:''}
+      </button>`;
+    })()}
+    <button class="btn-secundario" style="margin-bottom:8px" onclick="cerrarModal('modal-detalle');abrirModalTertulia()">♟ Mis tertulias favoritas</button>
     <hr class="divider">
     <div class="comentarios-seccion">
       <div class="seccion-titulo">Comentarios (${coms.length})</div>
