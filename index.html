@@ -250,12 +250,12 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
 <!-- APP PRINCIPAL -->
 <div id="app" class="hidden">
   <div class="header">
-    <div class="logo">as <span>bestas</span></div>
+    <div class="logo" onclick="irInicio()" style="cursor:pointer">as <span>bestas</span></div>
     <div class="user-badge" id="user-badge" onclick="cerrarSesion()">— · salir</div>
   </div>
   <nav class="nav">
-    <button class="active" onclick="mostrarSeccion('esta-semana',this)" id="nav-home">⌂ Inicio</button>
-    <button onclick="mostrarSeccion('historial',this)">Historial</button>
+    <button class="active" onclick="mostrarSeccion('esta-semana',this)" id="nav-home">Inicio</button>
+    <button onclick="mostrarSeccion('historial',this)">Vota!</button>
     <button onclick="mostrarSeccion('ranking',this)">Ranking</button>
     <button onclick="mostrarSeccion('estadisticas',this)">Estadísticas</button>
     <button onclick="mostrarSeccion('tertulias',this)">Tertulias</button>
@@ -273,7 +273,7 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
 </div>
 
 <!-- MODAL VOTAR -->
-<div class="modal-overlay hidden" id="modal-votar" onclick="cerrarSiOverlay(event,'modal-votar')">
+<div class="modal-overlay hidden" id="modal-votar" onclick="if(event.target===this)cerrarModal('modal-votar')">
   <div class="modal">
     <div class="modal-titulo" id="mv-titulo">—</div>
     <div class="modal-subtitulo" id="mv-subtitulo">—</div>
@@ -287,7 +287,7 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
 </div>
 
 <!-- MODAL AÑADIR PELÍCULA -->
-<div class="modal-overlay hidden" id="modal-aniadir" onclick="cerrarSiOverlay(event,'modal-aniadir')">
+<div class="modal-overlay hidden" id="modal-aniadir" onclick="if(event.target===this)cerrarModal('modal-aniadir')">
   <div class="modal">
     <div class="modal-titulo">Añadir película</div>
     <div class="modal-subtitulo">Busca el título en TMDB</div>
@@ -317,13 +317,13 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
 </div>
 
 <!-- MODAL DETALLE PELÍCULA -->
-<div class="modal-overlay hidden" id="modal-detalle" onclick="cerrarSiOverlay(event,'modal-detalle')">
+<div class="modal-overlay hidden" id="modal-detalle" onclick="if(event.target===this)cerrarModal('modal-detalle')">
   <div class="modal" id="modal-detalle-content"></div>
 </div>
 
 
 <!-- MODAL VOTAR CARTEL -->
-<div class="modal-overlay hidden" id="modal-cartel" onclick="cerrarSiOverlay(event,'modal-cartel')">
+<div class="modal-overlay hidden" id="modal-cartel" onclick="if(event.target===this)cerrarModal('modal-cartel')">
   <div class="modal">
     <div class="modal-titulo" id="mc-titulo">Valorar cartel</div>
     <div class="modal-subtitulo" id="mc-subtitulo"></div>
@@ -332,11 +332,11 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
     </div>
     <label class="form-label">Tu valoración del cartel (1–5)</label>
     <div class="cartel-stars" id="cartel-stars" style="justify-content:center;font-size:28px;margin:16px 0">
-      <span class="cartel-star" onclick="setCartelStar(1)">★</span>
-      <span class="cartel-star" onclick="setCartelStar(2)">★</span>
-      <span class="cartel-star" onclick="setCartelStar(3)">★</span>
-      <span class="cartel-star" onclick="setCartelStar(4)">★</span>
-      <span class="cartel-star" onclick="setCartelStar(5)">★</span>
+      <span class="cartel-star" onclick="setCartelStar(1);event.stopPropagation()">★</span>
+      <span class="cartel-star" onclick="setCartelStar(2);event.stopPropagation()">★</span>
+      <span class="cartel-star" onclick="setCartelStar(3);event.stopPropagation()">★</span>
+      <span class="cartel-star" onclick="setCartelStar(4);event.stopPropagation()">★</span>
+      <span class="cartel-star" onclick="setCartelStar(5);event.stopPropagation()">★</span>
     </div>
     <button class="confirmar-btn" id="confirmar-cartel-btn" disabled onclick="confirmarCartel()">Guardar valoración</button>
     <button class="cancelar-btn" onclick="cerrarModal('modal-cartel')">Cancelar</button>
@@ -344,7 +344,7 @@ input[type=range]{width:100%;accent-color:var(--rojo);margin-bottom:4px}
 </div>
 
 <!-- MODAL TERTULIA -->
-<div class="modal-overlay hidden" id="modal-tertulia" onclick="cerrarSiOverlay(event,'modal-tertulia')">
+<div class="modal-overlay hidden" id="modal-tertulia" onclick="if(event.target===this)cerrarModal('modal-tertulia')">
   <div class="modal">
     <div class="modal-titulo">Mis tertulias favoritas</div>
     <div class="modal-subtitulo" id="mt-subtitulo">Elige tu 1ª, 2ª y 3ª tertulia favorita de la temporada</div>
@@ -760,10 +760,10 @@ function renderEstadisticas(){
     }
   });
 
-  // Género director
+  // Género director (campo manual primero, inferencia como fallback)
   let nDirectoras=0,nDirectores=0,nSinDato=0;
   peliculas.forEach(p=>{
-    const g=inferirGeneroDir(p.director);
+    const g=p.genero_director||inferirGeneroDir(p.director);
     if(g==='F') nDirectoras++;
     else if(g==='M') nDirectores++;
     else nSinDato++;
@@ -1077,6 +1077,12 @@ function renderAdmin(){
                 <input type="date" id="ef-fecha-${p.id}" value="${p.fecha_sesion||''}">
                 <label class="form-label">País</label>
                 <input id="ef-pais-${p.id}" value="${esc(p.pais||'')}">
+                <label class="form-label">Género director/a</label>
+                <select id="ef-gendir-${p.id}" style="width:100%;background:#111;border:1px solid var(--borde);color:var(--crema);font-family:var(--font-body);font-size:13px;padding:8px 10px;border-radius:2px;outline:none;margin-bottom:8px">
+                  <option value="" ${!p.genero_director?'selected':''}>Sin dato</option>
+                  <option value="M" ${p.genero_director==='M'?'selected':''}>Director (hombre)</option>
+                  <option value="F" ${p.genero_director==='F'?'selected':''}>Directora (mujer)</option>
+                </select>
                 <label class="form-label">Enlace FilmAffinity</label>
                 <input id="ef-fa-${p.id}" value="${esc(p.filmaffinity_url||'')}"><label class="form-label">Nota FilmAffinity (ej: 6.8)</label>
                 <input id="ef-fanota-${p.id}" type="number" step="0.1" min="1" max="10" value="${p.fa_nota||''}" placeholder="ej: 7.2">
@@ -1104,7 +1110,8 @@ async function guardarEdicion(pelId){
   try{
     const fa=document.getElementById('ef-fa-'+pelId).value.trim();
     const faNota=parseFloat(document.getElementById('ef-fanota-'+pelId).value)||null;
-    await dbPatch('peliculas',`id=eq.${pelId}`,{titulo,director,fecha_sesion:fecha,pais,filmaffinity_url:fa||null,fa_nota:faNota});
+    const genDir=document.getElementById('ef-gendir-'+pelId).value||null;
+    await dbPatch('peliculas',`id=eq.${pelId}`,{titulo,director,fecha_sesion:fecha,pais,filmaffinity_url:fa||null,fa_nota:faNota,genero_director:genDir});
     toast('Guardado');
     await cargarTodo();
   }catch(e){ toast('Error guardando'); }
@@ -1150,6 +1157,13 @@ async function resetPin(id,nombre){
   }catch(e){ toast('Error'); }
 }
 
+function irInicio(){
+  document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('esta-semana').classList.remove('hidden');
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('nav-home').classList.add('active');
+}
+
 // ---- NAV ----
 function mostrarSeccion(id,btn){
   document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
@@ -1178,7 +1192,8 @@ function abrirModalCartel(pelId){
   else img.style.display='none';
   // Check existing vote
   const existing=(window._cartelVotos||[]).find(v=>v.pelicula_id===pelId&&v.miembro_id===usuarioActual.id);
-  setCartelStar(existing?existing.nota:0,true);
+  cartelStarVal=existing?existing.nota:0;
+  setCartelStar(cartelStarVal,true);
   document.getElementById('confirmar-cartel-btn').disabled=cartelStarVal===0;
   document.getElementById('modal-cartel').classList.remove('hidden');
 }
@@ -1220,34 +1235,45 @@ function abrirModalTertulia(){
   const pos2=myVotes.find(v=>v.posicion===2);
   const pos3=myVotes.find(v=>v.posicion===3);
 
-  const pelHTML=peliculas.map(p=>{
+  // Build tertulia list using DOM to avoid template literal issues
+  const container=document.createElement('div');
+  container.style.cssText='max-height:60vh;overflow-y:auto';
+
+  peliculas.forEach(p=>{
     const myVote=myVotes.find(v=>v.pelicula_id===p.id);
     const pos=myVote?myVote.posicion:0;
-    const posLabel=pos===1?'1ª':pos===2?'2ª':pos===3?'3ª':'';
     const canVote1=!pos1||pos===1;
     const canVote2=!pos2||pos===2;
     const canVote3=!pos3||pos===3;
-    return `<div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--borde)">
-      <div>
-        <div style="font-family:var(--font-display);font-size:13px;color:var(--crema)">${p.titulo}</div>
-        <div style="font-family:var(--font-mono);font-size:10px;color:var(--gris)">${p.fecha_sesion?formatFecha(p.fecha_sesion):''}</div>
-      </div>
-      <div style="display:flex;gap:5px;flex-shrink:0">
-        ${[1,2,3].map(n=>{
-          const isMe=pos===n;
-          const ok=n===1?canVote1:n===2?canVote2:canVote3;
-          const label=n===1?'1ª':n===2?'2ª':'3ª';
-          const bc=isMe?'var(--rojo)':'var(--borde)';
-          const bg=isMe?'rgba(200,56,42,.15)':'transparent';
-          const col=isMe?'var(--rojo)':'var(--gris)';
-          const dis=(!ok&&!isMe)?'opacity:.4;pointer-events:none':'cursor:pointer';
-          return `<button onclick="votarTertulia('${p.id}',${n})" style="font-family:var(--font-mono);font-size:10px;padding:4px 7px;border-radius:2px;border:1px solid ${bc};background:${bg};color:${col};${dis}">${label}</button>`;
-        }).join('')}
-      </div>
-    </div>`;
-  }).join('');
 
-  document.getElementById('mt-content').innerHTML=`<div style="max-height:60vh;overflow-y:auto">${pelHTML}</div>`;
+    const row=document.createElement('div');
+    row.style.cssText='display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(240,234,216,.15)';
+
+    const info=document.createElement('div');
+    info.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:13px;color:#f0ead8">${p.titulo}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888">${p.fecha_sesion?formatFecha(p.fecha_sesion):''}</div>`;
+
+    const btns=document.createElement('div');
+    btns.style.cssText='display:flex;gap:5px;flex-shrink:0';
+
+    [1,2,3].forEach(n=>{
+      const isMe=pos===n;
+      const ok=n===1?canVote1:n===2?canVote2:canVote3;
+      const label=n===1?'1ª':n===2?'2ª':'3ª';
+      const btn=document.createElement('button');
+      btn.textContent=label;
+      btn.style.cssText=`font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 7px;border-radius:2px;border:1px solid ${isMe?'#c8382a':'rgba(240,234,216,.15)'};background:${isMe?'rgba(200,56,42,.15)':'transparent'};color:${isMe?'#c8382a':'#888'};${(!ok&&!isMe)?'opacity:.4;pointer-events:none':'cursor:pointer'}`;
+      btn.addEventListener('click',()=>votarTertulia(p.id,n));
+      btns.appendChild(btn);
+    });
+
+    row.appendChild(info);
+    row.appendChild(btns);
+    container.appendChild(row);
+  });
+
+  document.getElementById('mt-content').innerHTML='';
+  document.getElementById('mt-content').appendChild(container);
   document.getElementById('modal-tertulia').classList.remove('hidden');
 }
 
