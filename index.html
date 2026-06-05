@@ -547,6 +547,7 @@ function renderInicio(){
         <div>
           <div style="font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:10px">${vv.length} voto${vv.length!==1?'s':''} · media: <strong style="color:var(--crema)">${media||'—'}</strong>${nc?' · '+nc+'💬':''}</div>
           ${yaVote?`<div style="font-family:var(--fm);font-size:11px;color:var(--gris);font-style:italic">Tu nota: <strong style="color:var(--crema)">${yaVote.nota}/10</strong></div>`:`<button class="btn-rojo" data-votar="${peli.id}">Votar esta película</button>`}
+          <button class="btn-borde" style="margin-top:8px" data-detalle="${peli.id}">Ver ficha</button>
         </div>
       </div>
     </div>
@@ -560,9 +561,12 @@ function renderInicio(){
     rl.appendChild(row);
   });
 
-  // Bind votar button
+  // Bind votar and detalle buttons
   el.querySelectorAll('[data-votar]').forEach(b=>{
     b.addEventListener('click',()=>openVotar(b.dataset.votar));
+  });
+  el.querySelectorAll('[data-detalle]').forEach(b=>{
+    b.addEventListener('click',()=>openDetalle(b.dataset.detalle));
   });
 }
 
@@ -693,7 +697,7 @@ function renderEstadisticas(){
     if(!paByKey[t]) paByKey[t]=[];
     paByKey[t].push(p);
   });
-  const paOrd=Object.entries(paMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const paOrd=Object.entries(paMap).sort((a,b)=>b[1]-a[1]);
   barSection('Por país',paOrd,paOrd[0]?.[1]||1,paByKey);
 
   // Décadas
@@ -705,7 +709,7 @@ function renderEstadisticas(){
   // Géneros
   const geMap={}, geByKey={};
   D.pelis.forEach(p=>{ if(!p.genero) return; p.genero.split(',').forEach(g=>{ const t=g.trim(); if(!t) return; geMap[t]=(geMap[t]||0)+1; if(!geByKey[t])geByKey[t]=[]; geByKey[t].push(p); }); });
-  const geOrd=Object.entries(geMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const geOrd=Object.entries(geMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
   barSection('Por género',geOrd,geOrd[0]?.[1]||1,geByKey);
 
   // Duración
