@@ -360,6 +360,37 @@ function fmtDur(m){
   const h=Math.floor(m/60),mm=m%60;
   return h>0?(mm>0?`${h}h ${mm}min`:`${h}h`):`${mm}min`;
 }
+
+const PAISES = {
+  'Afghanistan':'Afganistán','Albania':'Albania','Algeria':'Argelia','Argentina':'Argentina',
+  'Armenia':'Armenia','Australia':'Australia','Austria':'Austria','Azerbaijan':'Azerbaiyán',
+  'Belgium':'Bélgica','Bolivia':'Bolivia','Bosnia and Herzegovina':'Bosnia y Herzegovina',
+  'Brazil':'Brasil','Bulgaria':'Bulgaria','Cambodia':'Camboya','Canada':'Canadá',
+  'Chile':'Chile','China':'China','Colombia':'Colombia','Croatia':'Croacia',
+  'Cuba':'Cuba','Czech Republic':'República Checa','Czechia':'República Checa',
+  'Denmark':'Dinamarca','Ecuador':'Ecuador','Egypt':'Egipto','Estonia':'Estonia',
+  'Ethiopia':'Etiopía','Finland':'Finlandia','France':'Francia','Georgia':'Georgia',
+  'Germany':'Alemania','Ghana':'Ghana','Greece':'Grecia','Guatemala':'Guatemala',
+  'Hong Kong':'Hong Kong','Hungary':'Hungría','Iceland':'Islandia','India':'India',
+  'Indonesia':'Indonesia','Iran':'Irán','Iraq':'Irak','Ireland':'Irlanda',
+  'Israel':'Israel','Italy':'Italia','Japan':'Japón','Jordan':'Jordania',
+  'Kazakhstan':'Kazajistán','Kenya':'Kenia','Kosovo':'Kosovo','Latvia':'Letonia',
+  'Lebanon':'Líbano','Lithuania':'Lituania','Luxembourg':'Luxemburgo','Malaysia':'Malasia',
+  'Mexico':'México','Morocco':'Marruecos','Netherlands':'Países Bajos','New Zealand':'Nueva Zelanda',
+  'Nigeria':'Nigeria','Norway':'Noruega','Pakistan':'Pakistán','Palestine':'Palestina',
+  'Panama':'Panamá','Paraguay':'Paraguay','Peru':'Perú','Philippines':'Filipinas',
+  'Poland':'Polonia','Portugal':'Portugal','Romania':'Rumanía','Russia':'Rusia',
+  'Saudi Arabia':'Arabia Saudí','Senegal':'Senegal','Serbia':'Serbia',
+  'Slovakia':'Eslovaquia','Slovenia':'Eslovenia','South Africa':'Sudáfrica',
+  'South Korea':'Corea del Sur','Spain':'España','Sweden':'Suecia','Switzerland':'Suiza',
+  'Syria':'Siria','Taiwan':'Taiwán','Thailand':'Tailandia','Tunisia':'Túnez',
+  'Turkey':'Turquía','Ukraine':'Ucrania','United Kingdom':'Reino Unido',
+  'United States of America':'Estados Unidos','United States':'Estados Unidos',
+  'USA':'Estados Unidos','UK':'Reino Unido','Uruguay':'Uruguay','Venezuela':'Venezuela',
+  'Vietnam':'Vietnam','Yemen':'Yemen','Kosovo':'Kosovo','Bosnia':'Bosnia y Herzegovina'
+};
+function traducirPais(p){ return PAISES[p] || p; }
+
 function paisPrincipal(p){
   if(!p.pais) return null;
   return p.pais.split(',')[0].split('/')[0].trim()||null;
@@ -656,7 +687,8 @@ function renderEstadisticas(){
   // Países - usa paisPrincipal
   const paMap={}, paByKey={};
   D.pelis.forEach(p=>{
-    const t=paisPrincipal(p); if(!t) return;
+    const raw=paisPrincipal(p); if(!raw) return;
+    const t=traducirPais(raw);
     paMap[t]=(paMap[t]||0)+1;
     if(!paByKey[t]) paByKey[t]=[];
     paByKey[t].push(p);
@@ -688,8 +720,8 @@ function renderEstadisticas(){
   if(comp.length){
     const faDiv=document.createElement('div'); faDiv.style.marginBottom='24px';
     faDiv.innerHTML=`<div class="sec-label">Diferencia con FilmAffinity</div>`;
-    const masAlta=comp.filter(p=>p.diff>0).sort((a,b)=>b.diff-a.diff).slice(0,3);
-    const masBaja=comp.filter(p=>p.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,3);
+    const masAlta=comp.filter(p=>p.diff>0).sort((a,b)=>b.diff-a.diff).slice(0,10);
+    const masBaja=comp.filter(p=>p.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,10);
     if(masAlta.length){
       faDiv.innerHTML+=`<div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:8px">Más valoradas por el grupo que FA</div>`;
       masAlta.forEach(p=>{ const d=document.createElement('div'); d.style.cssText='display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde);cursor:pointer'; d.innerHTML=`<span style="font-family:var(--fd);font-size:13px">${esc(p.titulo)}</span><span style="font-family:var(--fm);font-size:11px;color:var(--rojo)">+${p.diff}</span>`; d.addEventListener('click',()=>openDetalle(p.id)); faDiv.appendChild(d); });
@@ -843,7 +875,22 @@ function openDetalle(pelId){
 
   // Votar btn or ya votaste
   if(yaVote){
-    body.innerHTML+=`<div style="font-family:var(--fm);font-size:11px;color:var(--gris);text-align:center;padding:12px 0;font-style:italic">Tu nota: <strong style="color:var(--crema)">${yaVote.nota}/10</strong></div>`;
+    const vDiv=document.createElement('div');
+    vDiv.style.cssText='text-align:center;padding:12px 0;border:1px solid var(--borde);border-radius:3px;margin-bottom:8px';
+    vDiv.innerHTML=`<div style="font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:8px">Tu nota: <strong style="color:var(--crema);font-size:16px">${yaVote.nota}/10</strong></div>`;
+    const changeBtn=document.createElement('button'); changeBtn.className='btn-rojo'; changeBtn.textContent='Cambiar voto'; changeBtn.style.marginRight='8px';
+    changeBtn.addEventListener('click',()=>{ hideModal('m-detalle'); openVotar(pelId, yaVote.nota); });
+    const removeBtn=document.createElement('button'); removeBtn.className='btn-borde'; removeBtn.textContent='Quitar voto'; removeBtn.style.width='auto'; removeBtn.style.marginBottom='0';
+    removeBtn.addEventListener('click', async()=>{
+      if(!confirm('¿Quitar tu voto de esta película?')) return;
+      try{
+        await dbDel('votos',`id=eq.${yaVote.id}`);
+        toast('Voto eliminado'); hideModal('m-detalle');
+        await loadAll(); renderAll();
+      }catch(e){ toast('Error: '+e.message); }
+    });
+    vDiv.appendChild(changeBtn); vDiv.appendChild(removeBtn);
+    body.appendChild(vDiv);
   } else {
     const vBtn=document.createElement('button'); vBtn.className='btn-rojo'; vBtn.textContent='Votar esta película'; vBtn.style.width='100%'; vBtn.style.textAlign='center'; vBtn.style.marginBottom='8px';
     vBtn.addEventListener('click',()=>{ hideModal('m-detalle'); openVotar(pelId); });
@@ -874,13 +921,13 @@ function openDetalle(pelId){
 }
 
 // ============ VOTAR ============
-function openVotar(pelId){
+function openVotar(pelId, notaActual=7){
   const p=D.pelis.find(x=>x.id===pelId); if(!p) return;
   peliVotando=p;
   document.getElementById('mv-title').textContent=p.titulo;
   document.getElementById('mv-sub').textContent=(p.director||'')+(p.anio?' · '+p.anio:'')+(p.fecha_sesion?' · '+fmtFecha(p.fecha_sesion):'');
-  document.getElementById('mv-slider').value=7;
-  document.getElementById('mv-nota').textContent='7';
+  document.getElementById('mv-slider').value=notaActual;
+  document.getElementById('mv-nota').textContent=notaActual;
   showModal('m-votar');
 }
 document.getElementById('mv-slider').addEventListener('input',function(){ document.getElementById('mv-nota').textContent=this.value; });
@@ -889,10 +936,13 @@ document.getElementById('mv-ok').addEventListener('click', async()=>{
   const nota=parseInt(document.getElementById('mv-slider').value);
   const btn=document.getElementById('mv-ok'); btn.disabled=true; btn.textContent='Guardando...';
   try{
+    // Delete existing vote if any (allows changing vote)
+    const existing=D.votos.find(v=>v.pelicula_id===peliVotando.id&&v.miembro_id===ME.id);
+    if(existing) await dbDel('votos',`id=eq.${existing.id}`);
     await dbPost('votos',{pelicula_id:peliVotando.id,miembro_id:ME.id,nota});
     hideModal('m-votar'); toast('Voto: '+nota+'/10');
     await loadAll(); renderAll();
-  }catch(e){ toast('Ya has votado esta película'); btn.disabled=false; btn.textContent='Confirmar voto'; }
+  }catch(e){ toast('Error: '+e.message); btn.disabled=false; btn.textContent='Confirmar voto'; }
 });
 document.getElementById('mv-cancel').addEventListener('click',()=>hideModal('m-votar'));
 document.getElementById('m-votar').addEventListener('click',e=>{ if(e.target===e.currentTarget) hideModal('m-votar'); });
