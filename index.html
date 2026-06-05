@@ -586,7 +586,7 @@ function makeHItem(num,p,media,nVotos,nComs){
     <div class="h-num">${num}</div>
     <div>
       <div class="h-title">${esc(p.titulo)}${estreno(p.anio)?'<span class="badge-estreno">estreno</span>':''}</div>
-      <div class="h-meta">${p.anio||''}${p.pais?' · '+esc(paisPrincipal(p)||p.pais):''}${p.fecha_sesion?' · '+fmtFecha(p.fecha_sesion):''}${nComs?' · '+nComs+'💬':''}</div>
+      <div class="h-meta">${p.anio||''}${p.pais?' · '+esc(traducirPais(paisPrincipal(p)||p.pais)):''}${p.fecha_sesion?' · '+fmtFecha(p.fecha_sesion):''}${nComs?' · '+nComs+'💬':''}</div>
     </div>
     <div class="h-nota">${media||'—'}<span>${nVotos} votos</span></div>`;
   div.addEventListener('click',()=>openDetalle(p.id));
@@ -854,35 +854,43 @@ function openDetalle(pelId){
   const body=document.getElementById('m-detalle-body');
   body.innerHTML='';
 
+  // Back button
   const back=document.createElement('button'); back.className='back-btn'; back.textContent='← Volver';
   back.addEventListener('click',()=>hideModal('m-detalle'));
   body.appendChild(back);
 
-  body.innerHTML+=`
-    <div style="display:grid;grid-template-columns:100px 1fr;gap:20px;margin-bottom:20px">
-      <div class="poster">${p.poster_url?`<img src="${esc(p.poster_url)}" alt="">`:`<div class="poster-ph">${esc(p.titulo)}</div>`}</div>
-      <div>
-        <div style="font-family:var(--fm);font-size:10px;color:var(--rojo);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">${p.fecha_sesion?fmtFecha(p.fecha_sesion):''}</div>
-        <div class="peli-titulo">${esc(p.titulo)}${estreno(p.anio)?'<span class="badge-estreno">estreno</span>':''}</div>
-        <div class="meta">${p.director?esc(p.director)+'<br>':''}${p.anio||''}${p.pais?' · '+esc(p.pais):''}${dur?' · '+dur:''}<br>${p.genero?esc(p.genero)+'<br>':''}</div>
-        ${faLink}
-      </div>
+  // Header
+  const hdr=document.createElement('div');
+  hdr.style.cssText='display:grid;grid-template-columns:100px 1fr;gap:20px;margin-bottom:20px';
+  hdr.innerHTML=`<div class="poster">${p.poster_url?`<img src="${esc(p.poster_url)}" alt="">`:`<div class="poster-ph">${esc(p.titulo)}</div>`}</div>
+    <div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--rojo);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">${p.fecha_sesion?fmtFecha(p.fecha_sesion):''}</div>
+      <div class="peli-titulo">${esc(p.titulo)}${estreno(p.anio)?'<span class="badge-estreno">estreno</span>':''}</div>
+      <div class="meta">${p.director?esc(p.director)+'<br>':''}${p.anio||''}${p.pais?' · '+esc(p.pais):''}${dur?' · '+dur:''}<br>${p.genero?esc(p.genero)+'<br>':''}</div>
+      ${faLink}
     </div>`;
+  body.appendChild(hdr);
 
+  // Media
   if(media){
-    body.innerHTML+=`<div class="det-media"><div class="det-media-n">${media}</div><div class="det-media-l">${vv.length} votos · media del grupo</div></div>`;
+    const med=document.createElement('div'); med.className='det-media';
+    med.innerHTML=`<div class="det-media-n">${media}</div><div class="det-media-l">${vv.length} votos · media del grupo</div>`;
+    body.appendChild(med);
   }
 
-  // Votar btn or ya votaste
+  // Vote section
   if(yaVote){
     const vDiv=document.createElement('div');
     vDiv.style.cssText='text-align:center;padding:12px 0;border:1px solid var(--borde);border-radius:3px;margin-bottom:8px';
-    vDiv.innerHTML=`<div style="font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:8px">Tu nota: <strong style="color:var(--crema);font-size:16px">${yaVote.nota}/10</strong></div>`;
+    const notaLbl=document.createElement('div');
+    notaLbl.style.cssText='font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:10px';
+    notaLbl.innerHTML=`Tu nota: <strong style="color:var(--crema);font-size:16px">${yaVote.nota}/10</strong>`;
+    vDiv.appendChild(notaLbl);
     const changeBtn=document.createElement('button'); changeBtn.className='btn-rojo'; changeBtn.textContent='Cambiar voto'; changeBtn.style.marginRight='8px';
     changeBtn.addEventListener('click',()=>{ hideModal('m-detalle'); openVotar(pelId, yaVote.nota); });
-    const removeBtn=document.createElement('button'); removeBtn.className='btn-borde'; removeBtn.textContent='Quitar voto'; removeBtn.style.width='auto'; removeBtn.style.marginBottom='0';
+    const removeBtn=document.createElement('button'); removeBtn.className='btn-borde'; removeBtn.textContent='Quitar voto'; removeBtn.style.display='inline-block'; removeBtn.style.width='auto'; removeBtn.style.marginBottom='0';
     removeBtn.addEventListener('click', async()=>{
-      if(!confirm('¿Quitar tu voto de esta película?')) return;
+      if(!confirm('¿Quitar tu voto?')) return;
       try{
         await dbDel('votos',`id=eq.${yaVote.id}`);
         toast('Voto eliminado'); hideModal('m-detalle');
@@ -892,19 +900,22 @@ function openDetalle(pelId){
     vDiv.appendChild(changeBtn); vDiv.appendChild(removeBtn);
     body.appendChild(vDiv);
   } else {
-    const vBtn=document.createElement('button'); vBtn.className='btn-rojo'; vBtn.textContent='Votar esta película'; vBtn.style.width='100%'; vBtn.style.textAlign='center'; vBtn.style.marginBottom='8px';
+    const vBtn=document.createElement('button'); vBtn.className='btn-rojo'; vBtn.textContent='Votar esta película'; vBtn.style.cssText='width:100%;text-align:center;margin-bottom:8px';
     vBtn.addEventListener('click',()=>{ hideModal('m-detalle'); openVotar(pelId); });
     body.appendChild(vBtn);
   }
 
   // Comments
-  body.innerHTML+=`<hr class="divider"><div class="sec-label">Comentarios (${coms.length})</div>`;
+  const hr=document.createElement('hr'); hr.className='divider'; body.appendChild(hr);
+  const clbl=document.createElement('div'); clbl.className='sec-label'; clbl.textContent='Comentarios ('+coms.length+')'; body.appendChild(clbl);
   if(coms.length){
-    coms.forEach(c=>{
-      body.innerHTML+=`<div class="com-item"><div class="com-autor">${esc(nombreM(c.miembro_id))}</div><div class="com-txt">${esc(c.texto)}</div><div class="com-fecha">${new Date(c.creado_en).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</div></div>`;
+    coms.forEach(cm=>{
+      const ci=document.createElement('div'); ci.className='com-item';
+      ci.innerHTML=`<div class="com-autor">${esc(nombreM(cm.miembro_id))}</div><div class="com-txt">${esc(cm.texto)}</div><div class="com-fecha">${new Date(cm.creado_en).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</div>`;
+      body.appendChild(ci);
     });
   } else {
-    body.innerHTML+=`<div style="font-family:var(--fm);font-size:11px;color:var(--gris);padding:12px 0">Sin comentarios aún.</div>`;
+    const nc=document.createElement('div'); nc.style.cssText='font-family:var(--fm);font-size:11px;color:var(--gris);padding:12px 0'; nc.textContent='Sin comentarios aún.'; body.appendChild(nc);
   }
   const ta=document.createElement('textarea'); ta.className='com-area'; ta.placeholder='Escribe tu comentario...'; ta.style.marginTop='16px';
   const cBtn=document.createElement('button'); cBtn.className='com-submit'; cBtn.textContent='Publicar';
