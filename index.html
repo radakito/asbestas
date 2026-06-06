@@ -552,7 +552,7 @@ function renderInicio(){
           <div class="meta">${peli.director?esc(peli.director)+'<br>':''}${peli.anio||''}${peli.pais?' · '+esc(peli.pais):''}${dur?' · '+dur:''}<br>${faLink}</div>
         </div>
         <div>
-          <div style="font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:10px">${vv.length} voto${vv.length!==1?'s':''} · media: <strong style="color:var(--crema)">${media||'—'}</strong>${nc?' · '+nc+'💬':''}</div>
+          <div style="font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:10px">${vv.length} voto${vv.length!==1?'s':''}${rankingRevelado()?' · media: <strong style="color:var(--crema)">'+(media||'—')+'</strong>':''}${nc?' · '+nc+'💬':''}</div>
           ${yaVote?`<div style="font-family:var(--fm);font-size:11px;color:var(--gris);font-style:italic">Tu nota: <strong style="color:var(--crema)">${yaVote.nota}/10</strong></div>`:`<button class="btn-rojo" data-votar="${peli.id}">Votar esta película</button>`}
           <button class="btn-borde" style="margin-top:8px" data-detalle="${peli.id}">Ver ficha</button>
         </div>
@@ -599,7 +599,7 @@ function makeHItem(num,p,media,nVotos,nComs){
       <div class="h-title">${esc(p.titulo)}${estreno(p.anio)?'<span class="badge-estreno">estreno</span>':''}</div>
       <div class="h-meta">${p.anio||''}${p.pais?' · '+esc(traducirPais(paisPrincipal(p)||p.pais)):''}${p.fecha_sesion?' · '+fmtFecha(p.fecha_sesion):''}${nComs?' · '+nComs+'💬':''}</div>
     </div>
-    <div class="h-nota">${media||'—'}<span>${nVotos} votos</span></div>`;
+    <div class="h-nota">${rankingRevelado()?(media||'—'):'—'}<span>${nVotos} votos</span></div>`;
   div.addEventListener('click',()=>openDetalle(p.id));
   return div;
 }
@@ -1182,6 +1182,11 @@ document.getElementById('m-detalle').addEventListener('click',e=>{ if(e.target==
 
 
 // ============ FESTIVAL FIN DE CURSO ============
+
+function rankingRevelado(){
+  return (D.rc||[]).find(x=>x.key==='revealed')?.value==='true' || ADMINS.includes(ME.nombre);
+}
+
 function renderFestival(){
   const el=document.getElementById('festival');
   el.innerHTML='';
