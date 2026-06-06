@@ -280,6 +280,22 @@ textarea.com-area::placeholder{color:var(--gris)}
   <div class="modal" id="m-detalle-body"></div>
 </div>
 
+
+<!-- MODAL FESTIVAL PROPUESTA -->
+<div class="overlay off" id="m-festival">
+  <div class="modal">
+    <div class="modal-title">Proponer película</div>
+    <div class="modal-sub">Busca la película que propones</div>
+    <label class="form-lbl">Buscar título</label>
+    <input class="txt-in" id="fest-search" placeholder="Título de la película..." style="margin-bottom:8px">
+    <div class="s-results" id="fest-results"></div>
+    <label class="form-lbl">¿Por qué la propones?</label>
+    <textarea class="com-area" id="fest-comment" placeholder="Escribe tu argumento..." style="min-height:60px;margin-bottom:16px"></textarea>
+    <button class="btn-confirm off" id="fest-ok">Proponer esta película</button>
+    <button class="btn-cancel" id="fest-cancel">Cancelar</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1374,38 +1390,52 @@ function makePropCard(prop, withDelete=false){
 let festivalSearchTO=null, festivalSel=null;
 
 function openFestivalAdd(){
-  // Reuse add modal with festival mode
   festivalSel=null;
-  document.getElementById('add-search').value='';
-  document.getElementById('add-results').innerHTML='';
-  document.getElementById('add-ok').classList.add('off');
-  document.getElementById('add-fa').value='';
-  document.getElementById('add-fecha').value='';
-  document.getElementById('add-manual').classList.add('off');
-
-  // Change modal title and button
-  document.querySelector('#m-add .modal-title').textContent='Proponer película';
-  document.querySelector('#m-add .modal-sub').textContent='Busca la película que propones';
-  document.getElementById('add-ok').textContent='Proponer esta película';
-  document.getElementById('add-ok').classList.remove('off');
-  document.getElementById('add-ok').disabled=true;
-
-  // Hide date and FA fields
-  document.getElementById('add-fecha').closest('div')?.classList?.add('off');
-
-  // Add comment field if not exists
-  let commentField=document.getElementById('festival-comment-wrap');
-  if(!commentField){
-    commentField=document.createElement('div'); commentField.id='festival-comment-wrap';
-    commentField.innerHTML=`<label class="form-lbl">¿Por qué la propones?</label><textarea class="com-area" id="festival-comment" placeholder="Escribe tu argumento..." style="min-height:60px;margin-bottom:16px"></textarea>`;
-    document.getElementById('add-ok').before(commentField);
-  }
-  document.getElementById('festival-comment').value='';
-
-  // Switch mode
-  document.getElementById('add-ok').dataset.mode='festival';
-  showModal('m-add');
+  document.getElementById('fest-search').value='';
+  document.getElementById('fest-results').innerHTML='';
+  document.getElementById('fest-comment').value='';
+  document.getElementById('fest-ok').classList.add('off');
+  showModal('m-festival');
 }
+
+document.getElementById('fest-cancel').addEventListener('click',()=>hideModal('m-festival'));
+document.getElementById('m-festival').addEventListener('click',e=>{ if(e.target===e.currentTarget) hideModal('m-festival'); });
+
+document.getElementById('fest-search').addEventListener('input',function(){
+  clearTimeout(festivalSearchTO);
+  const q=this.value; if(q.length<2){ document.getElementById('fest-results').innerHTML=''; return; }
+  festivalSearchTO=setTimeout(async()=>{
+    const r=await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TK}&query=${encodeURIComponent(q)}&language=es-ES`);
+    const d=await r.json(); const el=document.getElementById('fest-results'); el.innerHTML='';
+    if(!d.results?.length){ el.innerHTML='<div style="font-family:var(--fm);font-size:11px;color:var(--gris);padding:8px">Sin resultados</div>'; return; }
+    d.results.slice(0,6).forEach(item=>{
+      const div=document.createElement('div'); div.className='s-item';
+      div.innerHTML=`<div class="s-poster">${item.poster_path?`<img src="${TI}${item.poster_path}" alt="">`:''}</div><div><div style="font-family:var(--fd);font-size:14px">${esc(item.title)}</div><div style="font-family:var(--fm);font-size:10px;color:var(--gris)">${item.release_date?item.release_date.substring(0,4):'—'}</div></div>`;
+      div.addEventListener('click',()=>{
+        document.querySelectorAll('#fest-results .s-item').forEach(x=>x.classList.remove('sel'));
+        div.classList.add('sel'); festivalSel=item;
+        document.getElementById('fest-ok').classList.remove('off');
+      });
+      el.appendChild(div);
+    });
+  },350);
+});
+
+document.getElementById('fest-ok').addEventListener('click', async()=>{
+  if(!festivalSel) return;
+  const btn=document.getElementById('fest-ok'); btn.disabled=true; btn.textContent='Guardando...';
+  try{
+    const r=await fetch(`https://api.themoviedb.org/3/movie/${festivalSel.id}?api_key=${TK}&language=es-ES&append_to_response=credits`);
+    const d=await r.json();
+    const director=d.credits?.crew?.find(c=>c.job==='Director')?.name||'';
+    const anio=d.release_date?parseInt(d.release_date.substring(0,4)):null;
+    const posterUrl=d.poster_path?`${TI}${d.poster_path}`:null;
+    const comentario=document.getElementById('fest-comment').value.trim();
+    await dbPost('festival_props',{miembro_id:ME.id,titulo:d.title,director,anio,duracion:d.runtime||null,poster_url:posterUrl,tmdb_id:d.id,comentario});
+    hideModal('m-festival'); toast('Propuesta añadida: '+d.title);
+    await loadAll(); renderFestival();
+  }catch(e){ toast('Error: '+e.message); btn.disabled=false; btn.textContent='Proponer esta película'; }
+});
 
 // ============ INIT ============
 const saved=localStorage.getItem('ab_user');
