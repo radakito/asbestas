@@ -215,6 +215,7 @@ textarea.com-area::placeholder{color:var(--gris)}
     <button data-sec="estadisticas">Estadísticas</button>
     <button data-sec="tertulias">Tertulias</button>
     <button data-sec="carteles">Carteles</button>
+    <button data-sec="festival">Fin de curso</button>
     <button data-sec="admin" id="nav-admin" class="off">Admin</button>
   </nav>
   <main class="main">
@@ -224,6 +225,7 @@ textarea.com-area::placeholder{color:var(--gris)}
     <section id="estadisticas" class="off"></section>
     <section id="tertulias" class="off"></section>
     <section id="carteles" class="off"></section>
+    <section id="festival" class="off"></section>
     <section id="admin" class="off"></section>
   </main>
   <button class="fab off" id="fab">+</button>
@@ -330,15 +332,18 @@ async function dbDel(tabla, qs){
 
 // ============ LOAD ============
 async function loadAll(){
-  const [m, p, v, c, tv, cv] = await Promise.all([
+  const [m, p, v, c, tv, cv, fp, fv, fc] = await Promise.all([
     dbGet('miembros','activo=eq.true&order=nombre.asc'),
     dbGet('peliculas','order=fecha_sesion.asc.nullslast,creado_en.asc'),
     dbGet('votos','select=*'),
     dbGet('comentarios','select=*&order=creado_en.asc').catch(()=>[]),
     dbGet('tertulia_votos','select=*').catch(()=>[]),
-    dbGet('cartel_votos','select=*').catch(()=>[])
+    dbGet('cartel_votos','select=*').catch(()=>[]),
+    dbGet('festival_props','select=*&order=creado_en.asc').catch(()=>[]),
+    dbGet('festival_votos','select=*').catch(()=>[]),
+    dbGet('festival_config','select=*').catch(()=>[])
   ]);
-  D = { miembros:m, pelis:p, votos:v, coms:c, tv, cv };
+  D = { miembros:m, pelis:p, votos:v, coms:c, tv, cv, fp, fv, fc };
 }
 
 // ============ HELPERS ============
@@ -500,6 +505,7 @@ function renderAll(){
   renderEstadisticas();
   renderTertulias();
   renderCarteles();
+  renderFestival();
   if(ADMINS.includes(ME.nombre)) renderAdmin();
 }
 
@@ -973,7 +979,14 @@ function openAddModal(){
   document.getElementById('add-manual').classList.add('off');
   showModal('m-add');
 }
-document.getElementById('add-cancel').addEventListener('click',()=>hideModal('m-add'));
+document.getElementById('add-cancel').addEventListener('click',()=>{
+  hideModal('m-add');
+  document.getElementById('add-ok').dataset.mode='normal';
+  document.getElementById('add-ok').textContent='Añadir al club';
+  document.querySelector('#m-add .modal-title').textContent='Añadir película';
+  document.querySelector('#m-add .modal-sub').textContent='Busca en TMDB o introduce manualmente';
+  document.getElementById('festival-comment-wrap')?.remove();
+});
 document.getElementById('m-add').addEventListener('click',e=>{ if(e.target===e.currentTarget) hideModal('m-add'); });
 document.getElementById('add-manual-toggle').addEventListener('click',()=>document.getElementById('add-manual').classList.toggle('off'));
 document.getElementById('add-search').addEventListener('input',function(){
@@ -997,7 +1010,9 @@ document.getElementById('add-search').addEventListener('input',function(){
 });
 document.getElementById('add-ok').addEventListener('click', async()=>{
   if(!tmdbSel) return;
-  const btn=document.getElementById('add-ok'); btn.disabled=true; btn.textContent='Buscando...';
+  const btn=document.getElementById('add-ok'); btn.disabled=true;
+  const mode=btn.dataset.mode||'normal';
+  const origText=btn.textContent; btn.textContent='Buscando...';
   try{
     const r=await fetch(`https://api.themoviedb.org/3/movie/${tmdbSel.id}?api_key=${TK}&language=es-ES&append_to_response=credits`);
     const d=await r.json();
@@ -1006,12 +1021,24 @@ document.getElementById('add-ok').addEventListener('click', async()=>{
     const generos=d.genres?.map(g=>g.name).join(', ')||'';
     const anio=d.release_date?parseInt(d.release_date.substring(0,4)):null;
     const posterUrl=d.poster_path?`${TI}${d.poster_path}`:null;
-    const faManual=document.getElementById('add-fa').value.trim();
-    const faUrl=faManual||`https://www.filmaffinity.com/es/search.php?stype=title&stext=${encodeURIComponent(d.title)}`;
-    await dbPost('peliculas',{titulo:d.title,director,anio,pais,genero:generos,sinopsis:d.overview||'',poster_url:posterUrl,tmdb_id:d.id,filmaffinity_url:faUrl,fecha_sesion:document.getElementById('add-fecha').value||null,numero_sesion:D.pelis.length+1,temporada:TEMPORADA,duracion:d.runtime||null});
-    hideModal('m-add'); toast('Añadida: '+d.title);
+
+    if(mode==='festival'){
+      const comentario=document.getElementById('festival-comment')?.value.trim()||'';
+      await dbPost('festival_props',{miembro_id:ME.id,titulo:d.title,director,anio,duracion:d.runtime||null,poster_url:posterUrl,tmdb_id:d.id,comentario});
+      hideModal('m-add'); toast('Propuesta añadida: '+d.title);
+      // Reset modal
+      btn.dataset.mode='normal'; btn.textContent='Añadir al club';
+      document.querySelector('#m-add .modal-title').textContent='Añadir película';
+      document.querySelector('#m-add .modal-sub').textContent='Busca en TMDB o introduce manualmente';
+      document.getElementById('festival-comment-wrap')?.remove();
+    } else {
+      const faManual=document.getElementById('add-fa').value.trim();
+      const faUrl=faManual||`https://www.filmaffinity.com/es/search.php?stype=title&stext=${encodeURIComponent(d.title)}`;
+      await dbPost('peliculas',{titulo:d.title,director,anio,pais,genero:generos,sinopsis:d.overview||'',poster_url:posterUrl,tmdb_id:d.id,filmaffinity_url:faUrl,fecha_sesion:document.getElementById('add-fecha').value||null,numero_sesion:D.pelis.length+1,temporada:TEMPORADA,duracion:d.runtime||null});
+      hideModal('m-add'); toast('Añadida: '+d.title);
+    }
     await loadAll(); renderAll();
-  }catch(e){ toast('Error: '+e.message); btn.disabled=false; btn.textContent='Añadir al club'; }
+  }catch(e){ toast('Error: '+e.message); btn.disabled=false; btn.textContent=origText; }
 });
 document.getElementById('m-ok').addEventListener('click', async()=>{
   const titulo=document.getElementById('m-titulo').value.trim(); if(!titulo){ toast('El título es obligatorio'); return; }
@@ -1120,6 +1147,228 @@ function renderAdmin(){
 
 // ============ DETALLE OVERLAY CLOSE ============
 document.getElementById('m-detalle').addEventListener('click',e=>{ if(e.target===e.currentTarget) hideModal('m-detalle'); });
+
+
+// ============ FESTIVAL FIN DE CURSO ============
+function renderFestival(){
+  const el=document.getElementById('festival');
+  el.innerHTML='';
+
+  const revealed=(D.fc||[]).find(x=>x.key==='revealed')?.value==='true';
+  const isAdmin=ADMINS.includes(ME.nombre);
+  const myProps=(D.fp||[]).filter(p=>p.miembro_id===ME.id);
+  const allVotos=D.fv||[];
+  const myVotos=allVotos.filter(v=>v.miembro_id===ME.id);
+
+  // Header
+  const hdr=document.createElement('div');
+  hdr.innerHTML=`<div style="font-family:var(--fd);font-size:24px;font-weight:700;margin-bottom:6px">Evento fin de curso</div>
+    <div style="font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:24px">Propón hasta 3 películas y vota tus 5 favoritas (5-4-3-2-1 puntos)</div>`;
+  el.appendChild(hdr);
+
+  // Admin reveal button
+  if(isAdmin){
+    const revBtn=document.createElement('button');
+    revBtn.className='btn-rojo';
+    revBtn.textContent=revealed?'🔒 Ocultar resultados':'🎬 Revelar resultados al grupo';
+    revBtn.style.marginBottom='24px';
+    revBtn.addEventListener('click', async()=>{
+      try{
+        await fetch(`${SB}/rest/v1/festival_config?key=eq.revealed`,{
+          method:'DELETE',headers:{'apikey':SK,'Authorization':'Bearer '+SK}
+        });
+        await dbPost('festival_config',{key:'revealed',value:revealed?'false':'true'});
+        toast(revealed?'Resultados ocultados':'¡Resultados revelados!');
+        await loadAll(); renderFestival();
+      }catch(e){ toast('Error: '+e.message); }
+    });
+    el.appendChild(revBtn);
+  }
+
+  // My proposals section
+  const phdr=document.createElement('div'); phdr.className='sec-label';
+  phdr.textContent='Mis propuestas ('+myProps.length+'/3)'; el.appendChild(phdr);
+
+  myProps.forEach(prop=>{
+    const card=makePropCard(prop, true);
+    el.appendChild(card);
+  });
+
+  if(myProps.length<3){
+    const addBtn=document.createElement('button');
+    addBtn.className='btn-borde';
+    addBtn.textContent='+ Añadir propuesta';
+    addBtn.addEventListener('click',()=>openFestivalAdd());
+    el.appendChild(addBtn);
+  }
+
+  // All proposals for voting
+  const allProps=D.fp||[];
+  if(allProps.length){
+    const sep=document.createElement('hr'); sep.className='divider'; el.appendChild(sep);
+    const vh=document.createElement('div'); vh.className='sec-label';
+    vh.textContent='Todas las propuestas · vota tus 5 favoritas'; el.appendChild(vh);
+
+    const info=document.createElement('div');
+    info.style.cssText='font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:16px';
+    info.textContent='Asigna 5, 4, 3, 2 y 1 punto. Pulsa de nuevo para quitar.';
+    el.appendChild(info);
+
+    // Check which positions taken
+    const posOcupadas={};
+    myVotos.forEach(v=>posOcupadas[v.posicion]=v);
+
+    allProps.forEach(prop=>{
+      const myV=myVotos.find(v=>v.prop_id===prop.id);
+      const myPos=myV?myV.posicion:0;
+      const autor=D.miembros.find(m=>m.id===prop.miembro_id);
+
+      const wrap=document.createElement('div');
+      wrap.style.cssText='border:1px solid var(--borde);border-radius:3px;padding:14px;margin-bottom:10px';
+
+      // Card content
+      const info2=document.createElement('div');
+      info2.style.cssText='display:grid;grid-template-columns:70px 1fr;gap:14px;margin-bottom:12px';
+      info2.innerHTML=`
+        <div style="width:70px;height:104px;background:var(--gris2);border-radius:2px;overflow:hidden;flex-shrink:0">
+          ${prop.poster_url?`<img src="${esc(prop.poster_url)}" style="width:100%;height:100%;object-fit:cover">`:''}
+        </div>
+        <div>
+          <div style="font-family:var(--fd);font-size:15px;font-weight:700;margin-bottom:4px">${esc(prop.titulo)}</div>
+          <div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:4px">${prop.director?esc(prop.director)+' · ':''}${prop.anio||''}${prop.duracion?' · '+fmtDur(prop.duracion):''}</div>
+          <div style="font-family:var(--fm);font-size:10px;color:var(--rojo);margin-bottom:6px">propuesta por ${esc(autor?.nombre||'?')}</div>
+          ${prop.comentario?`<div style="font-family:var(--fb);font-size:12px;color:var(--crema2);font-style:italic">"${esc(prop.comentario)}"</div>`:''}
+        </div>`;
+      wrap.appendChild(info2);
+
+      // Vote buttons - only if not own proposal
+      if(prop.miembro_id!==ME.id){
+        const btns=document.createElement('div');
+        btns.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
+        [1,2,3,4,5].forEach(n=>{
+          const pts=6-n; // pos 1=5pts, pos2=4pts...
+          const isMe=myPos===n;
+          const posOcupada=posOcupadas[n]&&!isMe;
+          const btn=document.createElement('button');
+          btn.textContent=pts+'pts';
+          btn.className='pts-btn'+(isMe?' active':'')+(posOcupada?' disabled':'');
+          btn.disabled=posOcupada&&!isMe;
+          btn.addEventListener('click', async()=>{
+            if(posOcupada&&!isMe) return;
+            try{
+              if(isMe){
+                await dbDel('festival_votos',`id=eq.${myV.id}`);
+              } else {
+                if(myV) await dbDel('festival_votos',`id=eq.${myV.id}`);
+                await dbPost('festival_votos',{prop_id:prop.id,miembro_id:ME.id,posicion:n});
+              }
+              await loadAll(); renderFestival();
+            }catch(e){ toast('Error: '+e.message); }
+          });
+          btns.appendChild(btn);
+        });
+        wrap.appendChild(btns);
+      } else {
+        const own=document.createElement('div');
+        own.style.cssText='font-family:var(--fm);font-size:10px;color:var(--gris);font-style:italic';
+        own.textContent='Tu propuesta · no puedes votarla';
+        wrap.appendChild(own);
+      }
+      el.appendChild(wrap);
+    });
+  }
+
+  // Results - only if revealed or admin
+  if((revealed||isAdmin) && allProps.length){
+    const sep2=document.createElement('hr'); sep2.className='divider'; el.appendChild(sep2);
+    const rh=document.createElement('div'); rh.className='sec-label';
+    rh.textContent=(isAdmin&&!revealed?'[Solo admin] ':'')+' Ranking final'; el.appendChild(rh);
+
+    const pts={};
+    allVotos.forEach(v=>{
+      if(!pts[v.prop_id]) pts[v.prop_id]=0;
+      pts[v.prop_id]+=(6-v.posicion);
+    });
+    const ranking=allProps.map(p=>({...p,pts:pts[p.id]||0})).sort((a,b)=>b.pts-a.pts);
+
+    ranking.forEach((prop,i)=>{
+      const autor=D.miembros.find(m=>m.id===prop.miembro_id);
+      const item=document.createElement('div');
+      item.style.cssText='display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--borde)';
+      item.innerHTML=`
+        <div style="font-family:var(--fm);font-size:14px;color:${i<3?'var(--rojo)':'var(--gris)'};width:24px;text-align:right;flex-shrink:0;font-weight:700">${i+1}</div>
+        ${prop.poster_url?`<img src="${esc(prop.poster_url)}" style="width:36px;height:54px;object-fit:cover;border-radius:2px;flex-shrink:0">`:'<div style="width:36px;height:54px;background:var(--gris2);border-radius:2px;flex-shrink:0"></div>'}
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--fd);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(prop.titulo)}</div>
+          <div style="font-family:var(--fm);font-size:10px;color:var(--gris)">${esc(autor?.nombre||'?')}</div>
+        </div>
+        <div style="font-family:var(--fd);font-size:20px;font-weight:700;flex-shrink:0">${prop.pts}pts</div>`;
+      el.appendChild(item);
+    });
+  }
+}
+
+function makePropCard(prop, withDelete=false){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='border:1px solid var(--borde);border-radius:3px;padding:14px;margin-bottom:10px;display:grid;grid-template-columns:60px 1fr;gap:12px;align-items:start';
+  wrap.innerHTML=`
+    <div style="width:60px;height:90px;background:var(--gris2);border-radius:2px;overflow:hidden">
+      ${prop.poster_url?`<img src="${esc(prop.poster_url)}" style="width:100%;height:100%;object-fit:cover">`:''}
+    </div>
+    <div>
+      <div style="font-family:var(--fd);font-size:14px;font-weight:700;margin-bottom:3px">${esc(prop.titulo)}</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:6px">${prop.director?esc(prop.director)+' · ':''}${prop.anio||''}${prop.duracion?' · '+fmtDur(prop.duracion):''}</div>
+      ${prop.comentario?`<div style="font-family:var(--fb);font-size:12px;color:var(--crema2);font-style:italic;margin-bottom:8px">"${esc(prop.comentario)}"</div>`:''}
+      ${withDelete?`<button class="btn-sm" style="color:var(--rojo)" data-del-prop="${prop.id}">Eliminar</button>`:''}
+    </div>`;
+  if(withDelete){
+    wrap.querySelector('[data-del-prop]').addEventListener('click', async()=>{
+      if(!confirm('¿Eliminar esta propuesta?')) return;
+      try{
+        await dbDel('festival_props',`id=eq.${prop.id}`);
+        toast('Propuesta eliminada'); await loadAll(); renderFestival();
+      }catch(e){ toast('Error: '+e.message); }
+    });
+  }
+  return wrap;
+}
+
+// Festival add proposal modal
+let festivalSearchTO=null, festivalSel=null;
+
+function openFestivalAdd(){
+  // Reuse add modal with festival mode
+  festivalSel=null;
+  document.getElementById('add-search').value='';
+  document.getElementById('add-results').innerHTML='';
+  document.getElementById('add-ok').classList.add('off');
+  document.getElementById('add-fa').value='';
+  document.getElementById('add-fecha').value='';
+  document.getElementById('add-manual').classList.add('off');
+
+  // Change modal title and button
+  document.querySelector('#m-add .modal-title').textContent='Proponer película';
+  document.querySelector('#m-add .modal-sub').textContent='Busca la película que propones';
+  document.getElementById('add-ok').textContent='Proponer esta película';
+  document.getElementById('add-ok').classList.remove('off');
+  document.getElementById('add-ok').disabled=true;
+
+  // Hide date and FA fields
+  document.getElementById('add-fecha').closest('div')?.classList?.add('off');
+
+  // Add comment field if not exists
+  let commentField=document.getElementById('festival-comment-wrap');
+  if(!commentField){
+    commentField=document.createElement('div'); commentField.id='festival-comment-wrap';
+    commentField.innerHTML=`<label class="form-lbl">¿Por qué la propones?</label><textarea class="com-area" id="festival-comment" placeholder="Escribe tu argumento..." style="min-height:60px;margin-bottom:16px"></textarea>`;
+    document.getElementById('add-ok').before(commentField);
+  }
+  document.getElementById('festival-comment').value='';
+
+  // Switch mode
+  document.getElementById('add-ok').dataset.mode='festival';
+  showModal('m-add');
+}
 
 // ============ INIT ============
 const saved=localStorage.getItem('ab_user');
