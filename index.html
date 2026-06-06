@@ -332,7 +332,7 @@ async function dbDel(tabla, qs){
 
 // ============ LOAD ============
 async function loadAll(){
-  const [m, p, v, c, tv, cv, fp, fv, fc] = await Promise.all([
+  const [m, p, v, c, tv, cv, fp, fv, fc, rc] = await Promise.all([
     dbGet('miembros','activo=eq.true&order=nombre.asc'),
     dbGet('peliculas','order=fecha_sesion.asc.nullslast,creado_en.asc'),
     dbGet('votos','select=*'),
@@ -341,9 +341,10 @@ async function loadAll(){
     dbGet('cartel_votos','select=*').catch(()=>[]),
     dbGet('festival_props','select=*&order=creado_en.asc').catch(()=>[]),
     dbGet('festival_votos','select=*').catch(()=>[]),
-    dbGet('festival_config','select=*').catch(()=>[])
+    dbGet('festival_config','select=*').catch(()=>[]),
+    dbGet('ranking_config','select=*').catch(()=>[])
   ]);
-  D = { miembros:m, pelis:p, votos:v, coms:c, tv, cv, fp, fv, fc };
+  D = { miembros:m, pelis:p, votos:v, coms:c, tv, cv, fp, fv, fc, rc };
 }
 
 // ============ HELPERS ============
@@ -607,6 +608,18 @@ function makeHItem(num,p,media,nVotos,nComs){
 function renderRanking(){
   const el=document.getElementById('ranking');
   el.innerHTML='';
+
+  const revealed=(D.rc||[]).find(x=>x.key==='revealed')?.value==='true';
+  const isAdmin=ADMINS.includes(ME.nombre);
+
+  if(!revealed && !isAdmin){
+    el.innerHTML=`<div class="empty" style="padding:60px 0">
+      <div style="font-family:var(--fd);font-size:32px;font-weight:700;color:var(--rojo);margin-bottom:16px">🎬</div>
+      <div style="font-family:var(--fd);font-size:20px;margin-bottom:8px">Los resultados se revelarán<br>el día del evento</div>
+      <div style="font-family:var(--fm);font-size:11px;color:var(--gris)">Hasta entonces, la sorpresa está guardada</div>
+    </div>`;
+    return;
+  }
 
   const withMedia=D.pelis.map(p=>({...p,media:mediaP(p.id),nV:votosP(p.id).length}))
     .filter(p=>p.media!==null&&p.nV>=4)
@@ -1053,6 +1066,25 @@ document.getElementById('m-ok').addEventListener('click', async()=>{
 // ============ ADMIN ============
 function renderAdmin(){
   const el=document.getElementById('admin'); el.innerHTML='';
+
+  // Ranking reveal control
+  const revealed=(D.rc||[]).find(x=>x.key==='revealed')?.value==='true';
+  const rankSec=document.createElement('div'); rankSec.style.marginBottom='32px';
+  const rankLbl=document.createElement('div'); rankLbl.className='sec-label'; rankLbl.textContent='Control del ranking'; rankSec.appendChild(rankLbl);
+  const rankInfo=document.createElement('div'); rankInfo.style.cssText='font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:12px';
+  rankInfo.textContent=revealed?'El ranking es visible para todos los miembros.':'El ranking está oculto. Solo tú puedes verlo.';
+  rankSec.appendChild(rankInfo);
+  const revBtn=document.createElement('button'); revBtn.className='btn-rojo';
+  revBtn.textContent=revealed?'🔒 Ocultar ranking':'🎬 Revelar ranking al grupo';
+  revBtn.addEventListener('click', async()=>{
+    try{
+      await fetch(`${SB}/rest/v1/ranking_config?key=eq.revealed`,{method:'DELETE',headers:{'apikey':SK,'Authorization':'Bearer '+SK}});
+      await dbPost('ranking_config',{key:'revealed',value:revealed?'false':'true'});
+      toast(revealed?'Ranking ocultado':'¡Ranking revelado al grupo!');
+      await loadAll(); renderAll();
+    }catch(e){ toast('Error: '+e.message); }
+  });
+  rankSec.appendChild(revBtn); el.appendChild(rankSec);
 
   // Miembros
   const mh=document.createElement('div'); mh.className='sec-label'; mh.textContent='Miembros del grupo'; el.appendChild(mh);
