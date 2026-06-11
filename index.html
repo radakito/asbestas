@@ -852,8 +852,13 @@ function renderVotacionPage(secId, tabla, store){
     el.appendChild(row);
   });
 
-  // Ranking
-  if(allVotes.length){
+  // Ranking - hidden until revealed
+  if(allVotes.length && !rankingRevelado()){
+    const sep=document.createElement('hr'); sep.className='divider'; el.appendChild(sep);
+    const lock=document.createElement('div'); lock.className='empty';
+    lock.innerHTML=`<div style="font-family:var(--fd);font-size:24px;color:var(--rojo);margin-bottom:8px">🎬</div>El ranking se revelará el día del evento`;
+    el.appendChild(lock);
+  } else if(allVotes.length){
     const pts={};
     allVotes.forEach(v=>{
       if(!pts[v.pelicula_id]) pts[v.pelicula_id]={p:0,v1:0,v2:0,v3:0};
