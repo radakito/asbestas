@@ -754,9 +754,9 @@ function renderEstadisticas(){
   const durByKey={}; Object.entries(durMap).forEach(([k,v])=>durByKey[k]=v);
   barSection('Por duración',durOrd,Math.max(...durOrd.map(x=>x[1]),1),durByKey);
 
-  // FA comparison
+  // FA comparison - hidden until ranking revealed
   const comp=D.pelis.filter(p=>p.fa_nota&&mediaP(p.id)).map(p=>({...p,diff:parseFloat((parseFloat(mediaP(p.id))-p.fa_nota).toFixed(1))})).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
-  if(comp.length){
+  if(comp.length && rankingRevelado()){
     const faDiv=document.createElement('div'); faDiv.style.marginBottom='24px';
     faDiv.innerHTML=`<div class="sec-label">Diferencia con FilmAffinity</div>`;
     const masAlta=comp.filter(p=>p.diff>0).sort((a,b)=>b.diff-a.diff).slice(0,10);
@@ -1255,8 +1255,14 @@ function renderFestival(){
     el.appendChild(addBtn);
   }
 
-  // All proposals for voting
-  const allProps=D.fp||[];
+  // All proposals for voting - randomized order (stable per session)
+  let allProps=D.fp||[];
+  if(allProps.length){
+    if(!window._festivalShuffleSeed) window._festivalShuffleSeed=Math.random();
+    const seed=window._festivalShuffleSeed;
+    allProps=[...allProps].map((p,i)=>({p,r:((i*9301+49297)*seed)%233280}))
+      .sort((a,b)=>a.r-b.r).map(x=>x.p);
+  }
   if(allProps.length){
     const sep=document.createElement('hr'); sep.className='divider'; el.appendChild(sep);
     const vh=document.createElement('div'); vh.className='sec-label';
@@ -1394,7 +1400,10 @@ function openFestivalAdd(){
   document.getElementById('fest-search').value='';
   document.getElementById('fest-results').innerHTML='';
   document.getElementById('fest-comment').value='';
-  document.getElementById('fest-ok').classList.add('off');
+  const btn=document.getElementById('fest-ok');
+  btn.classList.add('off');
+  btn.disabled=false;
+  btn.textContent='Proponer esta película';
   showModal('m-festival');
 }
 
