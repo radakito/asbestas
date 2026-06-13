@@ -875,7 +875,7 @@ function renderEstadisticas(){
     // 5. Mayor consenso vs mayor división
     const consensoData=D.pelis.map(p=>{
       const vv=votosP(p.id);
-      if(vv.length<2) return null;
+      if(vv.length<4) return null;
       const m=vv.reduce((a,b)=>a+b.nota,0)/vv.length;
       const variance=vv.reduce((a,b)=>a+Math.pow(b.nota-m,2),0)/vv.length;
       const stddev=Math.sqrt(variance);
@@ -924,14 +924,41 @@ function renderEstadisticas(){
       mesesMap[key].sum+=parseFloat(m);
       mesesMap[key].n++;
     });
-    const mesesOrd=Object.entries(mesesMap).sort((a,b)=>a[1].fecha-b[1].fecha);
+    // Build month -> pelis list for drilldown
+    const mesesPelis={};
+    D.pelis.forEach(p=>{
+      if(!p.fecha_sesion) return;
+      const m=mediaP(p.id); if(!m) return;
+      const fecha=new Date(p.fecha_sesion+'T12:00:00');
+      const key=fecha.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+      if(!mesesPelis[key]) mesesPelis[key]=[];
+      mesesPelis[key].push(p);
+    });
+
+    const mesesOrd=Object.entries(mesesMap).sort((a,b)=>(b[1].sum/b[1].n)-(a[1].sum/a[1].n));
     if(mesesOrd.length){
       const sec7=document.createElement('div'); sec7.style.marginBottom='24px';
-      sec7.innerHTML=`<div class="sec-label">Media de notas por mes</div>`;
+      const lbl7=document.createElement('div'); lbl7.className='sec-label'; lbl7.textContent='Media de notas por mes'; sec7.appendChild(lbl7);
       const maxMedia=Math.max(...mesesOrd.map(([,v])=>v.sum/v.n));
       mesesOrd.forEach(([mes,v])=>{
         const media=(v.sum/v.n).toFixed(1);
-        sec7.innerHTML+=`<div class="bar-item"><div class="bar-row"><span class="bar-lbl">${esc(mes)}</span><span class="bar-cnt">${media} · ${v.n} pelis</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(media/maxMedia*100)}%"></div></div></div>`;
+        const item=document.createElement('div'); item.className='bar-item';
+        const row=document.createElement('div'); row.className='bar-row';
+        row.innerHTML=`<span class="bar-lbl">${esc(mes)} <span style="font-size:9px">▾</span></span><span class="bar-cnt">${media} · ${v.n} pelis</span>`;
+        const track=document.createElement('div'); track.className='bar-track';
+        track.innerHTML=`<div class="bar-fill" style="width:${Math.round(media/maxMedia*100)}%"></div>`;
+        const dd=document.createElement('div'); dd.className='drilldown off';
+        (mesesPelis[mes]||[]).forEach(p=>{
+          const di=document.createElement('div'); di.className='drilldown-item';
+          di.innerHTML=`${p.poster_url?`<img src="${esc(p.poster_url)}" style="width:28px;height:42px;object-fit:cover;border-radius:2px;flex-shrink:0">`:'<div style="width:28px;height:42px;background:var(--gris2);border-radius:2px;flex-shrink:0"></div>'}
+            <div style="flex:1;min-width:0"><div style="font-family:var(--fd);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.titulo)}</div><div style="font-family:var(--fm);font-size:10px;color:var(--gris)">${p.anio||''}${p.director?' · '+esc(p.director):''}</div></div>
+            <div style="font-family:var(--fd);font-size:16px;font-weight:700;flex-shrink:0">${mediaP(p.id)||'—'}</div>`;
+          di.addEventListener('click',()=>openDetalle(p.id));
+          dd.appendChild(di);
+        });
+        row.addEventListener('click',()=>dd.classList.toggle('off'));
+        item.appendChild(row); item.appendChild(track); item.appendChild(dd);
+        sec7.appendChild(item);
       });
       el.appendChild(sec7);
     }
