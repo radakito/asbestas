@@ -725,8 +725,10 @@ function renderEstadisticas(){
 
   // Países - usa paisPrincipal
   const paMap={}, paByKey={};
+  let sinPais=0;
   D.pelis.forEach(p=>{
-    const raw=paisPrincipal(p); if(!raw) return;
+    const raw=paisPrincipal(p);
+    if(!raw){ sinPais++; return; }
     const t=traducirPais(raw);
     paMap[t]=(paMap[t]||0)+1;
     if(!paByKey[t]) paByKey[t]=[];
@@ -734,6 +736,12 @@ function renderEstadisticas(){
   });
   const paOrd=Object.entries(paMap).sort((a,b)=>b[1]-a[1]);
   barSection('Por país',paOrd,paOrd[0]?.[1]||1,paByKey);
+  if(sinPais>0){
+    const warn=document.createElement('div');
+    warn.style.cssText='font-family:var(--fm);font-size:10px;color:var(--gris);margin-top:-12px;margin-bottom:24px';
+    warn.textContent=`⚠ ${sinPais} película${sinPais!==1?'s':''} sin país asignado · corregible desde Admin`;
+    el.appendChild(warn);
+  }
 
   // Décadas
   const deMap={}, deByKey={};
@@ -862,6 +870,70 @@ function renderEstadisticas(){
         </div>`;
       });
       el.appendChild(sec4);
+    }
+
+    // 5. Mayor consenso vs mayor división
+    const consensoData=D.pelis.map(p=>{
+      const vv=votosP(p.id);
+      if(vv.length<2) return null;
+      const m=vv.reduce((a,b)=>a+b.nota,0)/vv.length;
+      const variance=vv.reduce((a,b)=>a+Math.pow(b.nota-m,2),0)/vv.length;
+      const stddev=Math.sqrt(variance);
+      return {...p,stddev,nV:vv.length};
+    }).filter(x=>x);
+    if(consensoData.length){
+      const masConsenso=[...consensoData].sort((a,b)=>a.stddev-b.stddev).slice(0,5);
+      const masDivision=[...consensoData].sort((a,b)=>b.stddev-a.stddev).slice(0,5);
+      const sec5=document.createElement('div'); sec5.style.marginBottom='24px';
+      sec5.innerHTML=`<div class="sec-label">Consenso vs división</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:8px">Mayor consenso (notas más parecidas)</div>`;
+      masConsenso.forEach(p=>{ sec5.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fd);font-size:13px">${esc(p.titulo)}</span><span style="font-family:var(--fm);font-size:11px;color:var(--rojo)">±${p.stddev.toFixed(1)}</span></div>`; });
+      sec5.innerHTML+=`<div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin:12px 0 8px">Mayor división (notas más dispares)</div>`;
+      masDivision.forEach(p=>{ sec5.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fd);font-size:13px">${esc(p.titulo)}</span><span style="font-family:var(--fm);font-size:11px;color:var(--gris)">±${p.stddev.toFixed(1)}</span></div>`; });
+      el.appendChild(sec5);
+    }
+
+    // 6. Generosos y exigentes (min 10 pelis votadas)
+    const mediasPersona={};
+    D.miembros.forEach(m=>{
+      const vv=D.votos.filter(v=>v.miembro_id===m.id);
+      if(vv.length>=10){
+        mediasPersona[m.nombre]=(vv.reduce((a,b)=>a+b.nota,0)/vv.length).toFixed(2);
+      }
+    });
+    const persOrd=Object.entries(mediasPersona).sort((a,b)=>parseFloat(b[1])-parseFloat(a[1]));
+    if(persOrd.length){
+      const sec6=document.createElement('div'); sec6.style.marginBottom='24px';
+      sec6.innerHTML=`<div class="sec-label">Podio generosos / exigentes</div><div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:8px">Mínimo 10 películas votadas · media personal de notas</div>`;
+      persOrd.forEach(([nombre,media],i)=>{
+        const color=i===0?'var(--rojo)':(i===persOrd.length-1?'var(--gris)':'var(--crema2)');
+        const tag=i===0?' 🌟 el más generoso':(i===persOrd.length-1?' 🎯 el más exigente':'');
+        sec6.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fb);font-size:13px;color:${color}">${esc(nombre)}${tag}</span><span style="font-family:var(--fd);font-size:15px;font-weight:700">${media}</span></div>`;
+      });
+      el.appendChild(sec6);
+    }
+
+    // 7. Notas por mes
+    const mesesMap={};
+    D.pelis.forEach(p=>{
+      if(!p.fecha_sesion) return;
+      const m=mediaP(p.id); if(!m) return;
+      const fecha=new Date(p.fecha_sesion+'T12:00:00');
+      const key=fecha.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+      if(!mesesMap[key]) mesesMap[key]={sum:0,n:0,fecha};
+      mesesMap[key].sum+=parseFloat(m);
+      mesesMap[key].n++;
+    });
+    const mesesOrd=Object.entries(mesesMap).sort((a,b)=>a[1].fecha-b[1].fecha);
+    if(mesesOrd.length){
+      const sec7=document.createElement('div'); sec7.style.marginBottom='24px';
+      sec7.innerHTML=`<div class="sec-label">Media de notas por mes</div>`;
+      const maxMedia=Math.max(...mesesOrd.map(([,v])=>v.sum/v.n));
+      mesesOrd.forEach(([mes,v])=>{
+        const media=(v.sum/v.n).toFixed(1);
+        sec7.innerHTML+=`<div class="bar-item"><div class="bar-row"><span class="bar-lbl">${esc(mes)}</span><span class="bar-cnt">${media} · ${v.n} pelis</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(media/maxMedia*100)}%"></div></div></div>`;
+      });
+      el.appendChild(sec7);
     }
   }
 }
