@@ -647,14 +647,28 @@ function renderRanking(){
     if(!list.length) return;
     const h=document.createElement('div'); h.className='sec-label'; h.textContent=title; el.appendChild(h);
     list.forEach((p,i)=>{
+      const wrap=document.createElement('div');
       const d=document.createElement('div'); d.className='r-item';
+      const arrow=rankingRevelado()?` <span style="font-size:9px">▾</span>`:'';
       d.innerHTML=`
         <div class="r-pos ${i<3?'top':''}">${i+1}</div>
         <div class="r-poster">${p.poster_url?`<img src="${esc(p.poster_url)}" alt="">`:''}</div>
-        <div><div class="h-title">${esc(p.titulo)}${estreno(p.anio)?'<span class="badge-estreno">estreno</span>':''}</div><div class="h-meta">${p.director||''}${p.anio?' · '+p.anio:''}</div></div>
+        <div><div class="h-title">${esc(p.titulo)}${estreno(p.anio)?'<span class="badge-estreno">estreno</span>':''}${arrow}</div><div class="h-meta">${p.director||''}${p.anio?' · '+p.anio:''}</div></div>
         <div class="h-nota">${p.media}<span>${p.nV} votos</span></div>`;
-      d.addEventListener('click',()=>openDetalle(p.id));
-      el.appendChild(d);
+
+      if(rankingRevelado()){
+        const dd=document.createElement('div'); dd.className='drilldown off'; dd.style.marginBottom='8px';
+        const vv=votosP(p.id).map(v=>({nombre:nombreM(v.miembro_id),nota:v.nota})).sort((a,b)=>b.nota-a.nota);
+        vv.forEach(v=>{
+          dd.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fb);font-size:12px">${esc(v.nombre)}</span><span style="font-family:var(--fd);font-size:14px;font-weight:700">${v.nota}</span></div>`;
+        });
+        d.addEventListener('click',(e)=>{ dd.classList.toggle('off'); });
+        wrap.appendChild(d); wrap.appendChild(dd);
+      } else {
+        d.addEventListener('click',()=>openDetalle(p.id));
+        wrap.appendChild(d);
+      }
+      el.appendChild(wrap);
     });
   }
 
@@ -754,13 +768,6 @@ function renderEstadisticas(){
   D.pelis.forEach(p=>{ if(!p.genero) return; p.genero.split(',').forEach(g=>{ const t=g.trim(); if(!t) return; geMap[t]=(geMap[t]||0)+1; if(!geByKey[t])geByKey[t]=[]; geByKey[t].push(p); }); });
   const geOrd=Object.entries(geMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
   barSection('Por género',geOrd,geOrd[0]?.[1]||1,geByKey);
-
-  // Duración
-  const durMap={'–90 min':[],'90–120 min':[],'120–150 min':[],'+150 min':[]};
-  D.pelis.forEach(p=>{ if(!p.duracion) return; if(p.duracion<90)durMap['–90 min'].push(p); else if(p.duracion<120)durMap['90–120 min'].push(p); else if(p.duracion<150)durMap['120–150 min'].push(p); else durMap['+150 min'].push(p); });
-  const durOrd=Object.entries(durMap).filter(([,v])=>v.length).map(([k,v])=>[k,v.length]);
-  const durByKey={}; Object.entries(durMap).forEach(([k,v])=>durByKey[k]=v);
-  barSection('Por duración',durOrd,Math.max(...durOrd.map(x=>x[1]),1),durByKey);
 
   // FA comparison - hidden until ranking revealed
   const comp=D.pelis.filter(p=>p.fa_nota&&mediaP(p.id)).map(p=>({...p,diff:parseFloat((parseFloat(mediaP(p.id))-p.fa_nota).toFixed(1))})).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
