@@ -771,6 +771,99 @@ function renderEstadisticas(){
     }
     el.appendChild(faDiv);
   }
+
+  // ============ EXTRA STATS - hidden until revealed ============
+  if(rankingRevelado()){
+    const hr=document.createElement('hr'); hr.className='divider'; el.appendChild(hr);
+    const revLbl=document.createElement('div'); revLbl.className='sec-label';
+    revLbl.textContent='🎬 Estadísticas de la revelación'; el.appendChild(revLbl);
+
+    // 1. Pelis vistas por miembro (asistencia)
+    const asistencia={};
+    D.miembros.forEach(m=>asistencia[m.id]=0);
+    D.votos.forEach(v=>{ if(asistencia[v.miembro_id]!==undefined) asistencia[v.miembro_id]++; });
+    const asisOrd=Object.entries(asistencia).map(([id,n])=>[nombreM(id),n]).sort((a,b)=>b[1]-a[1]);
+    if(asisOrd.length){
+      const maxA=asisOrd[0]?.[1]||1;
+      const sec1=document.createElement('div'); sec1.style.marginBottom='24px';
+      sec1.innerHTML=`<div class="sec-label">Asistencia · películas votadas por persona</div>`;
+      asisOrd.forEach(([nombre,n])=>{
+        sec1.innerHTML+=`<div class="bar-item"><div class="bar-row"><span class="bar-lbl">${esc(nombre)}</span><span class="bar-cnt">${n}/${D.pelis.length}</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(n/maxA*100)}%"></div></div></div>`;
+      });
+      el.appendChild(sec1);
+    }
+
+    // 2. Pelis más/menos vistas
+    const vistasP=D.pelis.map(p=>({...p,n:votosP(p.id).length})).sort((a,b)=>b.n-a.n);
+    if(vistasP.length){
+      const masV=vistasP.slice(0,5);
+      const menosV=[...vistasP].sort((a,b)=>a.n-b.n).slice(0,5);
+      const sec2=document.createElement('div'); sec2.style.marginBottom='24px';
+      sec2.innerHTML=`<div class="sec-label">Películas con más y menos asistencia</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:8px">Más votadas</div>`;
+      masV.forEach(p=>{ sec2.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fd);font-size:13px">${esc(p.titulo)}</span><span style="font-family:var(--fm);font-size:11px;color:var(--rojo)">${p.n} votos</span></div>`; });
+      sec2.innerHTML+=`<div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin:12px 0 8px">Menos votadas</div>`;
+      menosV.forEach(p=>{ sec2.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fd);font-size:13px">${esc(p.titulo)}</span><span style="font-family:var(--fm);font-size:11px;color:var(--gris)">${p.n} votos</span></div>`; });
+      el.appendChild(sec2);
+    }
+
+    // 3. Correlación entre miembros (afinidad de gustos)
+    // For each pair of members, compute avg abs diff over commonly-voted films
+    const miembrosConVotos=D.miembros.filter(m=>D.votos.some(v=>v.miembro_id===m.id));
+    if(miembrosConVotos.length>=2){
+      const sec3=document.createElement('div'); sec3.style.marginBottom='24px';
+      sec3.innerHTML=`<div class="sec-label">Afinidad de gustos entre miembros</div><div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:8px">Menor diferencia = gustos más parecidos</div>`;
+      const pairs=[];
+      for(let i=0;i<miembrosConVotos.length;i++){
+        for(let j=i+1;j<miembrosConVotos.length;j++){
+          const m1=miembrosConVotos[i], m2=miembrosConVotos[j];
+          const v1=D.votos.filter(v=>v.miembro_id===m1.id);
+          const v2=D.votos.filter(v=>v.miembro_id===m2.id);
+          const common=v1.filter(a=>v2.some(b=>b.pelicula_id===a.pelicula_id));
+          if(common.length<3) continue;
+          let totalDiff=0;
+          common.forEach(a=>{
+            const b=v2.find(x=>x.pelicula_id===a.pelicula_id);
+            totalDiff+=Math.abs(a.nota-b.nota);
+          });
+          const avgDiff=(totalDiff/common.length);
+          pairs.push({m1:m1.nombre,m2:m2.nombre,diff:avgDiff,n:common.length});
+        }
+      }
+      pairs.sort((a,b)=>a.diff-b.diff);
+      if(pairs.length){
+        const masAfines=pairs.slice(0,5);
+        const menosAfines=[...pairs].sort((a,b)=>b.diff-a.diff).slice(0,5);
+        sec3.innerHTML+=`<div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:8px">Gustos más parecidos</div>`;
+        masAfines.forEach(p=>{ sec3.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fb);font-size:13px">${esc(p.m1)} & ${esc(p.m2)}</span><span style="font-family:var(--fm);font-size:11px;color:var(--rojo)">±${p.diff.toFixed(1)}</span></div>`; });
+        sec3.innerHTML+=`<div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin:12px 0 8px">Gustos más opuestos</div>`;
+        menosAfines.forEach(p=>{ sec3.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fb);font-size:13px">${esc(p.m1)} & ${esc(p.m2)}</span><span style="font-family:var(--fm);font-size:11px;color:var(--gris)">±${p.diff.toFixed(1)}</span></div>`; });
+      }
+      el.appendChild(sec3);
+    }
+
+    // 4. Índice de rareza - mayores discrepancias individuo vs grupo
+    const rareza=[];
+    D.pelis.forEach(p=>{
+      const media=mediaP(p.id); if(!media) return;
+      const mediaNum=parseFloat(media);
+      votosP(p.id).forEach(v=>{
+        rareza.push({nombre:nombreM(v.miembro_id),titulo:p.titulo,tuNota:v.nota,media:mediaNum,diff:Math.abs(v.nota-mediaNum)});
+      });
+    });
+    rareza.sort((a,b)=>b.diff-a.diff);
+    if(rareza.length){
+      const sec4=document.createElement('div'); sec4.style.marginBottom='24px';
+      sec4.innerHTML=`<div class="sec-label">Mayores discrepancias individuo vs grupo</div>`;
+      rareza.slice(0,8).forEach(r=>{
+        sec4.innerHTML+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--borde)">
+          <div><span style="font-family:var(--fb);font-size:12px;color:var(--rojo)">${esc(r.nombre)}</span> <span style="font-family:var(--fd);font-size:13px">${esc(r.titulo)}</span></div>
+          <div style="font-family:var(--fm);font-size:11px;color:var(--gris);white-space:nowrap">tú: ${r.tuNota} · grupo: ${r.media}</div>
+        </div>`;
+      });
+      el.appendChild(sec4);
+    }
+  }
 }
 
 // ============ RENDER TERTULIAS / CARTELES ============
