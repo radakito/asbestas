@@ -626,6 +626,7 @@ function renderRanking(){
   el.innerHTML='';
 
   const revealed=(D.rc||[]).find(x=>x.key==='revealed')?.value==='true';
+  const festRevealed=(D.fc||[]).find(x=>x.key==='revealed')?.value==='true';
   const isAdmin=ADMINS.includes(ME.nombre);
 
   if(!revealed && !isAdmin){
@@ -1289,6 +1290,7 @@ function renderAdmin(){
 
   // Ranking reveal control
   const revealed=(D.rc||[]).find(x=>x.key==='revealed')?.value==='true';
+  const festRevealed=(D.fc||[]).find(x=>x.key==='revealed')?.value==='true';
   const rankSec=document.createElement('div'); rankSec.style.marginBottom='32px';
   const rankLbl=document.createElement('div'); rankLbl.className='sec-label'; rankLbl.textContent='Control del ranking'; rankSec.appendChild(rankLbl);
   const rankInfo=document.createElement('div'); rankInfo.style.cssText='font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:12px';
@@ -1305,6 +1307,24 @@ function renderAdmin(){
     }catch(e){ toast('Error: '+e.message); }
   });
   rankSec.appendChild(revBtn); el.appendChild(rankSec);
+
+  // Festival ranking reveal
+  const festSec=document.createElement('div'); festSec.style.marginBottom='32px';
+  const festLbl=document.createElement('div'); festLbl.className='sec-label'; festLbl.textContent='Control ranking · Fin de curso'; festSec.appendChild(festLbl);
+  const festInfo=document.createElement('div'); festInfo.style.cssText='font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:12px';
+  festInfo.textContent=festRevealed?'Ranking de fin de curso visible para todos.':'Ranking de fin de curso oculto.';
+  festSec.appendChild(festInfo);
+  const festRevBtn=document.createElement('button'); festRevBtn.className='btn-rojo';
+  festRevBtn.textContent=festRevealed?'🔒 Ocultar ranking fin de curso':'🎬 Revelar ranking fin de curso';
+  festRevBtn.addEventListener('click', async()=>{
+    try{
+      await fetch(`${SB}/rest/v1/festival_config?key=eq.revealed`,{method:'DELETE',headers:{'apikey':SK,'Authorization':'Bearer '+SK}});
+      await dbPost('festival_config',{key:'revealed',value:festRevealed?'false':'true'});
+      toast(festRevealed?'Ranking ocultado':'¡Ranking fin de curso revelado!');
+      await loadAll(); renderAll();
+    }catch(e){ toast('Error: '+e.message); }
+  });
+  festSec.appendChild(festRevBtn); el.appendChild(festSec);
 
   // Miembros
   const mh=document.createElement('div'); mh.className='sec-label'; mh.textContent='Miembros del grupo'; el.appendChild(mh);
@@ -1541,11 +1561,17 @@ function renderFestival(){
     });
   }
 
-  // Results - only if revealed or admin
-  if((revealed||isAdmin) && allProps.length){
+  // Results - only if festival revealed or admin
+  const festRevealed2=(D.fc||[]).find(x=>x.key==='revealed')?.value==='true';
+  if(allProps.length && !festRevealed2 && !isAdmin){
+    const sep2=document.createElement('hr'); sep2.className='divider'; el.appendChild(sep2);
+    const lock=document.createElement('div'); lock.className='empty';
+    lock.innerHTML='<div style="font-family:var(--fd);font-size:24px;color:var(--rojo);margin-bottom:8px">🎬</div>El ranking se revelará el día del evento';
+    el.appendChild(lock);
+  } else if((festRevealed2||isAdmin) && allProps.length){
     const sep2=document.createElement('hr'); sep2.className='divider'; el.appendChild(sep2);
     const rh=document.createElement('div'); rh.className='sec-label';
-    rh.textContent=(isAdmin&&!revealed?'[Solo admin] ':'')+' Ranking final'; el.appendChild(rh);
+    rh.textContent=(isAdmin&&!festRevealed2?'[Solo admin] ':'')+'Ranking final'; el.appendChild(rh);
 
     const pts={};
     allVotos.forEach(v=>{
