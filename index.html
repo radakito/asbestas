@@ -640,7 +640,7 @@ function renderRanking(){
 
   const withMedia=D.pelis.map(p=>({...p,media:mediaP(p.id),nV:votosP(p.id).length}))
     .filter(p=>p.media!==null&&p.nV>=4)
-    .sort((a,b)=>parseFloat(b.media)-parseFloat(a.media));
+    .sort((a,b)=>parseFloat(b.media)-parseFloat(a.media)||b.nV-a.nV);
 
   const estrenos=withMedia.filter(p=>estreno(p.anio));
 
@@ -771,7 +771,7 @@ function renderEstadisticas(){
   barSection('Por género',geOrd,geOrd[0]?.[1]||1,geByKey);
 
   // FA comparison - hidden until ranking revealed
-  const comp=D.pelis.filter(p=>p.fa_nota&&mediaP(p.id)).map(p=>({...p,diff:parseFloat((parseFloat(mediaP(p.id))-p.fa_nota).toFixed(1))})).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
+  const comp=D.pelis.filter(p=>p.fa_nota&&mediaP(p.id)&&votosP(p.id).length>=5).map(p=>({...p,diff:parseFloat((parseFloat(mediaP(p.id))-p.fa_nota).toFixed(1))})).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
   if(comp.length && rankingRevelado()){
     const faDiv=document.createElement('div'); faDiv.style.marginBottom='24px';
     faDiv.innerHTML=`<div class="sec-label">Diferencia con FilmAffinity</div>`;
@@ -825,7 +825,7 @@ function renderEstadisticas(){
 
     // 3. Correlación entre miembros (afinidad de gustos)
     // For each pair of members, compute avg abs diff over commonly-voted films
-    const miembrosConVotos=D.miembros.filter(m=>D.votos.some(v=>v.miembro_id===m.id));
+    const miembrosConVotos=D.miembros.filter(m=>D.votos.filter(v=>v.miembro_id===m.id).length>5);
     if(miembrosConVotos.length>=2){
       const sec3=document.createElement('div'); sec3.style.marginBottom='24px';
       sec3.innerHTML=`<div class="sec-label">Afinidad de gustos entre miembros</div><div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:8px">Menor diferencia = gustos más parecidos</div>`;
