@@ -173,6 +173,8 @@ textarea.com-area::placeholder{color:var(--gris)}
 .toast.on{opacity:1}
 .off{display:none!important}
 .badge-estreno{display:inline-block;font-family:var(--fm);font-size:9px;padding:2px 5px;border-radius:2px;background:rgba(200,56,42,.2);color:var(--rojo);border:1px solid rgba(200,56,42,.4);margin-left:6px;vertical-align:middle}
+.season-sel{display:flex;align-items:center;gap:8px;margin-bottom:20px;font-family:var(--fm);font-size:11px;color:var(--gris)}
+.season-sel select{background:#1e1e1e;border:1px solid var(--borde);color:var(--crema);font-family:var(--fm);font-size:12px;padding:6px 10px;border-radius:2px;outline:none;cursor:pointer}
 .fab{position:fixed;bottom:24px;right:20px;background:var(--rojo);color:var(--crema);border:none;width:48px;height:48px;border-radius:50%;font-size:24px;cursor:pointer;z-index:50;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(200,56,42,.4)}
 .fab:hover{background:var(--rojo-h)}
 </style>
@@ -304,6 +306,8 @@ const SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 const TK = '12e800990f66a67d30314bf0b48dcb72';
 const TI = 'https://image.tmdb.org/t/p/w200';
 const ADMINS = ['Mon'];
+const TEMPORADAS = ['2025-26','2024-25','2023-24'];
+let temporadaVista = '2025-26';
 const TEMPORADA = '2025-26';
 
 let ME = null;
@@ -629,16 +633,18 @@ function renderRanking(){
   const festRevealed=(D.fc||[]).find(x=>x.key==='revealed')?.value==='true';
   const isAdmin=ADMINS.includes(ME.nombre);
 
+  el.appendChild(makeSeasSel('ranking'));
   if(!revealed && !isAdmin){
-    el.innerHTML=`<div class="empty" style="padding:60px 0">
-      <div style="font-family:var(--fd);font-size:32px;font-weight:700;color:var(--rojo);margin-bottom:16px">🎬</div>
+    const lockDiv=document.createElement('div'); lockDiv.className='empty'; lockDiv.style.padding='60px 0';
+    lockDiv.innerHTML=`<div style="font-family:var(--fd);font-size:32px;font-weight:700;color:var(--rojo);margin-bottom:16px">🎬</div>
       <div style="font-family:var(--fd);font-size:20px;margin-bottom:8px">Los resultados se revelarán<br>el día del evento</div>
-      <div style="font-family:var(--fm);font-size:11px;color:var(--gris)">Hasta entonces, la sorpresa está guardada</div>
-    </div>`;
+      <div style="font-family:var(--fm);font-size:11px;color:var(--gris)">Hasta entonces, la sorpresa está guardada</div>`;
+    el.appendChild(lockDiv);
     return;
   }
 
-  const withMedia=D.pelis.map(p=>({...p,media:mediaP(p.id),nV:votosP(p.id).length}))
+  const pelsSeason=pelisTemporada(temporadaVista);
+  const withMedia=pelsSeason.map(p=>({...p,media:mediaP(p.id),nV:votosP(p.id).length}))
     .filter(p=>p.media!==null&&p.nV>=4)
     .sort((a,b)=>parseFloat(b.media)-parseFloat(a.media)||b.nV-a.nV);
 
@@ -682,7 +688,13 @@ function renderRanking(){
 function renderEstadisticas(){
   const el=document.getElementById('estadisticas');
   el.innerHTML='';
-  if(!D.pelis.length){ el.innerHTML='<div class="empty">Sin datos aún.</div>'; return; }
+  el.appendChild(makeSeasSel('estadisticas'));
+  const pelsStat=pelisTemporada(temporadaVista);
+  if(!pelsStat.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='Sin datos para esta temporada.'; el.appendChild(e); return; }
+
+  // Override D.pelis scope for stats with season filter
+  const _pelisBak=D.pelis; D.pelis=pelsStat;
+  const _votosBak=D.votos; D.votos=votosTemporada(temporadaVista);
 
   const totalVotos=D.votos.length;
   const medias=D.pelis.map(p=>parseFloat(mediaP(p.id))).filter(m=>!isNaN(m));
@@ -971,15 +983,20 @@ function renderEstadisticas(){
       el.appendChild(sec7);
     }
   }
+  // Restore
+  D.pelis=_pelisBak; D.votos=_votosBak;
 }
 
 // ============ RENDER TERTULIAS / CARTELES ============
 function renderVotacionPage(secId, tabla, store){
   const el=document.getElementById(secId);
   el.innerHTML='';
+  el.appendChild(makeSeasSel(secId));
 
-  const myVotes=D[store].filter(v=>v.miembro_id===ME.id);
-  const allVotes=D[store];
+  const pelsSec=pelisTemporada(temporadaVista);
+  const storeFiltered=(store==='tv'?tvTemporada(temporadaVista):cvTemporada(temporadaVista));
+  const myVotes=storeFiltered.filter(v=>v.miembro_id===ME.id);
+  const allVotes=storeFiltered;
 
   // Header
   const hdr=document.createElement('div'); hdr.className='sec-label';
@@ -996,7 +1013,7 @@ function renderVotacionPage(secId, tabla, store){
   const pos2=myVotes.find(v=>v.posicion===2);
   const pos3=myVotes.find(v=>v.posicion===3);
 
-  D.pelis.forEach(p=>{
+  pelsSec.forEach(p=>{
     const myV=myVotes.find(v=>v.pelicula_id===p.id);
     const myPos=myV?myV.posicion:0;
 
@@ -1363,7 +1380,9 @@ function renderAdmin(){
     const fields=[
       ['Título','ef-titulo',p.titulo,'text'],['Director/a','ef-dir',p.director||'','text'],
       ['Fecha','ef-fecha',p.fecha_sesion||'','date'],['País principal','ef-pais',p.pais||'','text'],
-      ['Nota FilmAffinity','ef-fanota',p.fa_nota||'','number'],['Enlace FilmAffinity','ef-fa',p.filmaffinity_url||'','text']
+      ['Género(s)','ef-genero',p.genero||'','text'],
+      ['Nota FilmAffinity','ef-fanota',p.fa_nota||'','number'],['Enlace FilmAffinity','ef-fa',p.filmaffinity_url||'','text'],
+      ['URL Póster','ef-poster',p.poster_url||'','text']
     ];
     fields.forEach(([lbl,id,val,type])=>{
       const l=document.createElement('label'); l.className='form-lbl'; l.style.marginTop='8px'; l.textContent=lbl; editBox.appendChild(l);
@@ -1422,6 +1441,42 @@ document.getElementById('m-detalle').addEventListener('click',e=>{ if(e.target==
 
 
 // ============ FESTIVAL FIN DE CURSO ============
+
+
+function pelisTemporada(temp){
+  return D.pelis.filter(p=>p.temporada===temp);
+}
+function votosTemporada(temp){
+  const ids=new Set(pelisTemporada(temp).map(p=>p.id));
+  return D.votos.filter(v=>ids.has(v.pelicula_id));
+}
+function tvTemporada(temp){
+  const ids=new Set(pelisTemporada(temp).map(p=>p.id));
+  return D.tv.filter(v=>ids.has(v.pelicula_id));
+}
+function cvTemporada(temp){
+  const ids=new Set(pelisTemporada(temp).map(p=>p.id));
+  return D.cv.filter(v=>ids.has(v.pelicula_id));
+}
+function makeSeasSel(currentSec){
+  const wrap=document.createElement('div'); wrap.className='season-sel';
+  wrap.innerHTML='<span>Temporada</span>';
+  const sel=document.createElement('select');
+  TEMPORADAS.forEach(t=>{
+    const o=document.createElement('option'); o.value=t; o.textContent=t;
+    if(t===temporadaVista) o.selected=true;
+    sel.appendChild(o);
+  });
+  sel.addEventListener('change',()=>{
+    temporadaVista=sel.value;
+    renderRanking(); renderEstadisticas(); renderTertulias(); renderCarteles();
+    // Re-show current section
+    document.querySelectorAll('main section').forEach(s=>s.classList.add('off'));
+    document.getElementById(currentSec).classList.remove('off');
+  });
+  wrap.appendChild(sel);
+  return wrap;
+}
 
 function rankingRevelado(){
   return (D.rc||[]).find(x=>x.key==='revealed')?.value==='true' || ADMINS.includes(ME.nombre);
