@@ -372,7 +372,7 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function votosP(id){ return D.votos.filter(v=>v.pelicula_id===id) }
 function mediaP(id){
   const vv=votosP(id); if(!vv.length) return null;
-  return (vv.reduce((a,b)=>a+b.nota,0)/vv.length).toFixed(1);
+  return (vv.reduce((a,b)=>a+b.nota,0)/vv.length).toFixed(2);
 }
 function comsP(id){ return D.coms.filter(c=>c.pelicula_id===id) }
 function nombreM(id){ return (D.miembros.find(m=>m.id===id)||{}).nombre||'?' }
@@ -700,8 +700,8 @@ function renderEstadisticas(){
 
   const totalVotos=D.votos.length;
   const medias=D.pelis.map(p=>parseFloat(mediaP(p.id))).filter(m=>!isNaN(m));
-  const mediaTemp=medias.length?(medias.reduce((a,b)=>a+b,0)/medias.length).toFixed(1):'—';
-  const mejorNota=medias.length?Math.max(...medias).toFixed(1):'—';
+  const mediaTemp=medias.length?(medias.reduce((a,b)=>a+b,0)/medias.length).toFixed(2):'—';
+  const mejorNota=medias.length?Math.max(...medias).toFixed(2):'—';
 
   // Stats cards
   const grid=document.createElement('div'); grid.className='stats-grid';
@@ -963,7 +963,7 @@ function renderEstadisticas(){
       const lbl7=document.createElement('div'); lbl7.className='sec-label'; lbl7.textContent='Media de notas por mes'; sec7.appendChild(lbl7);
       const maxMedia=Math.max(...mesesOrd.map(([,v])=>v.sum/v.n));
       mesesOrd.forEach(([mes,v])=>{
-        const media=(v.sum/v.n).toFixed(1);
+        const media=(v.sum/v.n).toFixed(2);
         const item=document.createElement('div'); item.className='bar-item';
         const row=document.createElement('div'); row.className='bar-row';
         row.innerHTML=`<span class="bar-lbl">${esc(mes)} <span style="font-size:9px">▾</span></span><span class="bar-cnt">${media} · ${v.n} pelis</span>`;
