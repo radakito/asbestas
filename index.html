@@ -555,12 +555,13 @@ document.getElementById('fab').addEventListener('click',()=>openAddModal());
 // ============ RENDER INICIO ============
 function renderInicio(){
   const el=document.getElementById('inicio');
-  const peli=D.pelis.length?D.pelis[D.pelis.length-1]:null;
+  const pelisActuales=D.pelis.filter(p=>p.temporada===TEMPORADA);
+  const peli=pelisActuales.length?pelisActuales[pelisActuales.length-1]:null;
   if(!peli){ el.innerHTML='<div class="empty">No hay película esta semana.<br>Añádela desde Admin.</div>'; return; }
   const vv=votosP(peli.id), media=mediaP(peli.id), yaVote=miVoto(peli.id);
   const dur=fmtDur(peli.duracion), nc=comsP(peli.id).length;
   const faLink=peli.filmaffinity_url?`<a href="${esc(peli.filmaffinity_url)}" target="_blank">FilmAffinity ↗</a>`:'';
-  const recientes=[...D.pelis].reverse().slice(1,5);
+  const recientes=[...pelisActuales].reverse().slice(1,5);
 
   el.innerHTML=`
     <div style="display:grid;grid-template-columns:100px 1fr;gap:20px;margin-bottom:32px;padding-bottom:32px;border-bottom:1px solid var(--borde)">
@@ -600,9 +601,10 @@ function renderInicio(){
 // ============ RENDER VOTA ============
 function renderVota(){
   const el=document.getElementById('vota');
-  if(!D.pelis.length){ el.innerHTML='<div class="empty">No hay películas aún.</div>'; return; }
-  const ordered=[...D.pelis].reverse();
-  el.innerHTML=`<div class="sec-label">Temporada ${TEMPORADA} · ${D.pelis.length} película${D.pelis.length!==1?'s':''}</div><div class="h-list" id="vota-list"></div>`;
+  const pelisActualesV=D.pelis.filter(p=>p.temporada===TEMPORADA);
+  if(!pelisActualesV.length){ el.innerHTML='<div class="empty">No hay películas aún.</div>'; return; }
+  const ordered=[...pelisActualesV].reverse();
+  el.innerHTML=`<div class="sec-label">Temporada ${TEMPORADA} · ${pelisActualesV.length} película${pelisActualesV.length!==1?'s':''}</div><div class="h-list" id="vota-list"></div>`;
   const list=document.getElementById('vota-list');
   ordered.forEach(p=>{
     const m=mediaP(p.id),vv=votosP(p.id),nc=comsP(p.id).length,num=D.pelis.indexOf(p)+1;
