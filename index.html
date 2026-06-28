@@ -217,6 +217,7 @@ textarea.com-area::placeholder{color:var(--gris)}
     <button data-sec="estadisticas">Estadísticas</button>
     <button data-sec="tertulias">Tertulias</button>
     <button data-sec="carteles">Carteles</button>
+    <button data-sec="comparativas">Comparativas</button>
     <button data-sec="festival">Fin de curso</button>
     <button data-sec="admin" id="nav-admin" class="off">Admin</button>
   </nav>
@@ -227,6 +228,7 @@ textarea.com-area::placeholder{color:var(--gris)}
     <section id="estadisticas" class="off"></section>
     <section id="tertulias" class="off"></section>
     <section id="carteles" class="off"></section>
+    <section id="comparativas" class="off"></section>
     <section id="festival" class="off"></section>
     <section id="admin" class="off"></section>
   </main>
@@ -306,7 +308,7 @@ const SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 const TK = '12e800990f66a67d30314bf0b48dcb72';
 const TI = 'https://image.tmdb.org/t/p/w200';
 const ADMINS = ['Mon'];
-const TEMPORADAS = ['2025-26','2024-25','2023-24'];
+const TEMPORADAS = ['2025-26','2024-25','2023-24','2022-23'];
 let temporadaVista = '2025-26';
 const TEMPORADA = '2025-26';
 
@@ -526,6 +528,7 @@ function renderAll(){
   renderEstadisticas();
   renderTertulias();
   renderCarteles();
+  renderComparativas();
   renderFestival();
   if(ADMINS.includes(ME.nombre)) renderAdmin();
 }
@@ -1732,6 +1735,151 @@ document.getElementById('fest-ok').addEventListener('click', async()=>{
     await loadAll(); renderFestival();
   }catch(e){ toast('Error: '+e.message); btn.disabled=false; btn.textContent='Proponer esta película'; }
 });
+
+
+// ============ ESTADÍSTICAS COMPARATIVAS ============
+function renderComparativas(){
+  const el=document.getElementById('comparativas');
+  el.innerHTML='';
+
+  const hdr=document.createElement('div');
+  hdr.innerHTML='<div style="font-family:var(--fd);font-size:22px;font-weight:700;margin-bottom:4px">Comparativa entre temporadas</div><div style="font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:28px">Estadísticas globales del club</div>';
+  el.appendChild(hdr);
+
+  const temps=TEMPORADAS.filter(t=>D.pelis.some(p=>p.temporada===t));
+  if(temps.length<2){ el.innerHTML+='<div class="empty">Necesitas al menos dos temporadas con datos.</div>'; return; }
+
+  // Helper: get pelis/votos for a season
+  function pT(t){ return D.pelis.filter(p=>p.temporada===t); }
+  function vT(t){ const ids=new Set(pT(t).map(p=>p.id)); return D.votos.filter(v=>ids.has(v.pelicula_id)); }
+  function mediaT(t){
+    const vv=vT(t); if(!vv.length) return null;
+    return (vv.reduce((a,b)=>a+b.nota,0)/vv.length).toFixed(2);
+  }
+  function bestP(t){
+    return pT(t).map(p=>({...p,m:parseFloat(mediaP(p.id)),n:votosP(p.id).length}))
+      .filter(p=>p.m&&p.n>=3).sort((a,b)=>b.m-a.m||b.n-a.n)[0];
+  }
+  function worstP(t){
+    return pT(t).map(p=>({...p,m:parseFloat(mediaP(p.id)),n:votosP(p.id).length}))
+      .filter(p=>p.m&&p.n>=3).sort((a,b)=>a.m-b.m||b.n-a.n)[0];
+  }
+  function topPais(t){
+    const m={}; pT(t).forEach(p=>{const pa=paisPrincipal(p); if(pa)m[pa]=(m[pa]||0)+1;});
+    return Object.entries(m).sort((a,b)=>b[1]-a[1])[0];
+  }
+  function topGenero(t){
+    const m={}; pT(t).forEach(p=>{if(p.genero)p.genero.split(',').forEach(g=>{const gT=g.trim();if(gT)m[gT]=(m[gT]||0)+1;})});
+    return Object.entries(m).sort((a,b)=>b[1]-a[1])[0];
+  }
+  function pctDirectoras(t){
+    const pelis=pT(t).filter(p=>p.genero_director||inferGenero(p.director));
+    const f=pelis.filter(p=>(p.genero_director||inferGenero(p.director))==='F').length;
+    return pelis.length?Math.round(f/pelis.length*100):null;
+  }
+  function mediaGenerosa(t){
+    const vv=vT(t); if(!vv.length) return null;
+    const byM={};
+    vv.forEach(v=>{if(!byM[v.miembro_id])byM[v.miembro_id]=[];byM[v.miembro_id].push(v.nota);});
+    const medias=Object.entries(byM).filter(([,ns])=>ns.length>=5).map(([id,ns])=>({nombre:nombreM(id),m:ns.reduce((a,b)=>a+b,0)/ns.length}));
+    if(!medias.length) return null;
+    return medias.sort((a,b)=>b.m-a.m)[0];
+  }
+
+  // ---- TABLA RESUMEN ----
+  const resumen=document.createElement('div'); resumen.style.marginBottom='32px';
+  resumen.innerHTML='<div class="sec-label">Resumen por temporada</div>';
+
+  temps.forEach(t=>{
+    const np=pT(t).length, nv=vT(t).length, media=mediaT(t);
+    const best=bestP(t), worst=worstP(t);
+    const tp=topPais(t), tg=topGenero(t);
+    const pctF=pctDirectoras(t);
+    const gen=mediaGenerosa(t);
+
+    const card=document.createElement('div');
+    card.style.cssText='border:1px solid var(--borde);border-radius:3px;padding:18px;margin-bottom:12px';
+    card.innerHTML=`
+      <div style="font-family:var(--fd);font-size:18px;font-weight:700;color:var(--rojo);margin-bottom:12px">${t}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div class="stat-card" style="padding:10px"><div class="stat-lbl">Películas</div><div class="stat-val" style="font-size:22px">${np}</div></div>
+        <div class="stat-card" style="padding:10px"><div class="stat-lbl">Media general</div><div class="stat-val" style="font-size:22px">${media||'—'}</div></div>
+      </div>
+      ${best?`<div style="margin-bottom:6px"><span style="font-family:var(--fm);font-size:10px;color:var(--gris)">MEJOR · </span><span style="font-family:var(--fd);font-size:13px">${esc(best.titulo)}</span> <span style="font-family:var(--fm);font-size:11px;color:var(--rojo)">${best.m.toFixed(2)}</span></div>`:''}
+      ${worst?`<div style="margin-bottom:10px"><span style="font-family:var(--fm);font-size:10px;color:var(--gris)">PEOR · </span><span style="font-family:var(--fd);font-size:13px">${esc(worst.titulo)}</span> <span style="font-family:var(--fm);font-size:11px;color:var(--gris)">${worst.m.toFixed(2)}</span></div>`:''}
+      <div style="font-family:var(--fm);font-size:11px;color:var(--gris);line-height:2">
+        ${tp?`🌍 País más visto: <span style="color:var(--crema2)">${esc(traducirPais(tp[0]))} (${tp[1]})</span><br>`:''}
+        ${tg?`🎭 Género más visto: <span style="color:var(--crema2)">${esc(tg[0])} (${tg[1]})</span><br>`:''}
+        ${pctF!==null?`🎬 Directoras: <span style="color:#d4826a">${pctF}%</span><br>`:''}
+        ${gen?`🌟 El más generoso: <span style="color:var(--crema2)">${esc(gen.nombre)} (${gen.m.toFixed(2)})</span>`:''}
+      </div>`;
+    resumen.appendChild(card);
+  });
+  el.appendChild(resumen);
+
+  // ---- GRÁFICO DE MEDIAS ----
+  const grafDiv=document.createElement('div'); grafDiv.style.marginBottom='32px';
+  grafDiv.innerHTML='<div class="sec-label">Evolución de la media por temporada</div>';
+  const maxM=Math.max(...temps.map(t=>parseFloat(mediaT(t)||0)));
+  temps.slice().reverse().forEach(t=>{
+    const m=mediaT(t); if(!m) return;
+    grafDiv.innerHTML+=`<div class="bar-item"><div class="bar-row"><span class="bar-lbl">${t}</span><span class="bar-cnt">${m}</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(parseFloat(m)/maxM*100)}%"></div></div></div>`;
+  });
+  el.appendChild(grafDiv);
+
+  // ---- PAÍSES ACUMULADOS ----
+  const paisDiv=document.createElement('div'); paisDiv.style.marginBottom='32px';
+  paisDiv.innerHTML='<div class="sec-label">Países más vistos · histórico</div>';
+  const paTotal={}, paByKey={};
+  D.pelis.forEach(p=>{
+    const raw=paisPrincipal(p); if(!raw) return;
+    const t=traducirPais(raw);
+    paTotal[t]=(paTotal[t]||0)+1;
+    if(!paByKey[t])paByKey[t]=[];
+    paByKey[t].push(p);
+  });
+  const paOrd=Object.entries(paTotal).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const paMax=paOrd[0]?.[1]||1;
+  paOrd.forEach(([pais,n])=>{
+    const uid='cmp_'+pais.replace(/[^a-z]/gi,'_');
+    const item=document.createElement('div'); item.className='bar-item';
+    const row=document.createElement('div'); row.className='bar-row';
+    row.innerHTML=`<span class="bar-lbl">${esc(pais)} <span style="font-size:9px">▾</span></span><span class="bar-cnt">${n}</span>`;
+    const track=document.createElement('div'); track.className='bar-track';
+    track.innerHTML=`<div class="bar-fill" style="width:${Math.round(n/paMax*100)}%"></div>`;
+    const dd=document.createElement('div'); dd.className='drilldown off';
+    (paByKey[pais]||[]).forEach(p=>{
+      const di=document.createElement('div'); di.className='drilldown-item';
+      di.innerHTML=`${p.poster_url?`<img src="${esc(p.poster_url)}" style="width:28px;height:42px;object-fit:cover;border-radius:2px;flex-shrink:0">`:'<div style="width:28px;height:42px;background:var(--gris2);border-radius:2px;flex-shrink:0"></div>'}
+        <div style="flex:1;min-width:0"><div style="font-family:var(--fd);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.titulo)}</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--gris)">${p.temporada||''}</div></div>
+        <div style="font-family:var(--fd);font-size:16px;font-weight:700;flex-shrink:0">${mediaP(p.id)||'—'}</div>`;
+      di.addEventListener('click',()=>openDetalle(p.id));
+      dd.appendChild(di);
+    });
+    row.addEventListener('click',()=>dd.classList.toggle('off'));
+    item.appendChild(row); item.appendChild(track); item.appendChild(dd);
+    paisDiv.appendChild(item);
+  });
+  el.appendChild(paisDiv);
+
+  // ---- MEJORES PELIS DE TODA LA HISTORIA ----
+  const topDiv=document.createElement('div'); topDiv.style.marginBottom='32px';
+  topDiv.innerHTML='<div class="sec-label">Top 10 · todas las temporadas</div>';
+  const topAll=D.pelis.map(p=>({...p,m:parseFloat(mediaP(p.id)),n:votosP(p.id).length}))
+    .filter(p=>p.m&&p.n>=3).sort((a,b)=>b.m-a.m||b.n-a.n).slice(0,10);
+  topAll.forEach((p,i)=>{
+    const item=document.createElement('div'); item.className='r-item'; item.style.cursor='pointer';
+    item.innerHTML=`
+      <div class="r-pos ${i<3?'top':''}">${i+1}</div>
+      <div class="r-poster">${p.poster_url?`<img src="${esc(p.poster_url)}" alt="">`:''}</div>
+      <div><div class="h-title">${esc(p.titulo)}</div><div class="h-meta">${p.temporada||''} · ${p.director||''}</div></div>
+      <div class="h-nota">${p.m.toFixed(2)}<span>${p.n} votos</span></div>`;
+    item.addEventListener('click',()=>openDetalle(p.id));
+    topDiv.appendChild(item);
+  });
+  el.appendChild(topDiv);
+}
 
 // ============ INIT ============
 const saved=localStorage.getItem('ab_user');
