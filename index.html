@@ -1863,22 +1863,133 @@ function renderComparativas(){
   });
   el.appendChild(paisDiv);
 
-  // ---- MEJORES PELIS DE TODA LA HISTORIA ----
-  const topDiv=document.createElement('div'); topDiv.style.marginBottom='32px';
-  topDiv.innerHTML='<div class="sec-label">Top 10 · todas las temporadas</div>';
-  const topAll=D.pelis.map(p=>({...p,m:parseFloat(mediaP(p.id)),n:votosP(p.id).length}))
-    .filter(p=>p.m&&p.n>=3).sort((a,b)=>b.m-a.m||b.n-a.n).slice(0,10);
-  topAll.forEach((p,i)=>{
-    const item=document.createElement('div'); item.className='r-item'; item.style.cursor='pointer';
-    item.innerHTML=`
-      <div class="r-pos ${i<3?'top':''}">${i+1}</div>
-      <div class="r-poster">${p.poster_url?`<img src="${esc(p.poster_url)}" alt="">`:''}</div>
-      <div><div class="h-title">${esc(p.titulo)}</div><div class="h-meta">${p.temporada||''} · ${p.director||''}</div></div>
-      <div class="h-nota">${p.m.toFixed(2)}<span>${p.n} votos</span></div>`;
-    item.addEventListener('click',()=>openDetalle(p.id));
-    topDiv.appendChild(item);
+  // ---- TOP Y FLOP HISTÓRICO ----
+  function makeHistoricList(title, list){
+    const div=document.createElement('div'); div.style.marginBottom='24px';
+    div.innerHTML=`<div class="sec-label">${title}</div>`;
+    list.forEach((p,i)=>{
+      const item=document.createElement('div'); item.className='r-item'; item.style.cursor='pointer';
+      item.innerHTML=`
+        <div class="r-pos ${i<3?'top':''}">${i+1}</div>
+        <div class="r-poster">${p.poster_url?`<img src="${esc(p.poster_url)}" alt="">`:''}</div>
+        <div><div class="h-title">${esc(p.titulo)}</div><div class="h-meta">${p.temporada||''} · ${p.director||''}</div></div>
+        <div class="h-nota">${p.m.toFixed(2)}<span>${p.n} votos</span></div>`;
+      item.addEventListener('click',()=>openDetalle(p.id));
+      div.appendChild(item);
+    });
+    return div;
+  }
+
+  const allWithMedia=D.pelis.map(p=>({...p,m:parseFloat(mediaP(p.id)),n:votosP(p.id).length}))
+    .filter(p=>p.m&&p.n>=3);
+  const topAll=[...allWithMedia].sort((a,b)=>b.m-a.m||b.n-a.n).slice(0,10);
+  const flopAll=[...allWithMedia].sort((a,b)=>a.m-b.m||b.n-a.n).slice(0,10);
+  el.appendChild(makeHistoricList('Top 10 · todas las temporadas', topAll));
+  el.appendChild(makeHistoricList('Flop 10 · todas las temporadas', flopAll));
+
+  // ---- CONSENSO Y DIVISIÓN HISTÓRICO ----
+  const consensoAll=D.pelis.map(p=>{
+    const vv=votosP(p.id); if(vv.length<4) return null;
+    const m=vv.reduce((a,b)=>a+b.nota,0)/vv.length;
+    const std=Math.sqrt(vv.reduce((a,b)=>a+Math.pow(b.nota-m,2),0)/vv.length);
+    return {...p,std,nV:vv.length};
+  }).filter(x=>x);
+
+  if(consensoAll.length){
+    const masC=[...consensoAll].sort((a,b)=>a.std-b.std).slice(0,5);
+    const masD=[...consensoAll].sort((a,b)=>b.std-a.std).slice(0,5);
+    const cDiv=document.createElement('div'); cDiv.style.marginBottom='28px';
+    cDiv.innerHTML='<div class="sec-label">Consenso y división · histórico</div><div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:8px">Mayor consenso</div>';
+    masC.forEach(p=>{ cDiv.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde);cursor:pointer" onclick="openDetalle('${p.id}')"><span style="font-family:var(--fd);font-size:13px">${esc(p.titulo)}</span><div style="text-align:right"><span style="font-family:var(--fm);font-size:11px;color:var(--rojo)">±${p.std.toFixed(2)}</span><div style="font-family:var(--fm);font-size:9px;color:var(--gris)">${p.temporada}</div></div></div>`; });
+    cDiv.innerHTML+='<div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin:12px 0 8px">Mayor división</div>';
+    masD.forEach(p=>{ cDiv.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde);cursor:pointer" onclick="openDetalle('${p.id}')"><span style="font-family:var(--fd);font-size:13px">${esc(p.titulo)}</span><div style="text-align:right"><span style="font-family:var(--fm);font-size:11px;color:var(--gris)">±${p.std.toFixed(2)}</span><div style="font-family:var(--fm);font-size:9px;color:var(--gris)">${p.temporada}</div></div></div>`; });
+    el.appendChild(cDiv);
+  }
+
+  // ---- MAYORES DISCREPANCIAS HISTÓRICO ----
+  const rarezaAll=[];
+  D.pelis.forEach(p=>{
+    const media=mediaP(p.id); if(!media) return;
+    const mNum=parseFloat(media);
+    votosP(p.id).forEach(v=>{
+      rarezaAll.push({nombre:nombreM(v.miembro_id),titulo:p.titulo,temporada:p.temporada,tuNota:v.nota,media:mNum,diff:Math.abs(v.nota-mNum)});
+    });
   });
-  el.appendChild(topDiv);
+  rarezaAll.sort((a,b)=>b.diff-a.diff);
+  if(rarezaAll.length){
+    const rDiv=document.createElement('div'); rDiv.style.marginBottom='28px';
+    rDiv.innerHTML='<div class="sec-label">Mayores discrepancias · histórico</div>';
+    rarezaAll.slice(0,10).forEach(r=>{
+      rDiv.innerHTML+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--borde)">
+        <div style="min-width:0;flex:1">
+          <span style="font-family:var(--fb);font-size:12px;color:var(--rojo)">${esc(r.nombre)}</span>
+          <span style="font-family:var(--fd);font-size:13px"> · ${esc(r.titulo)}</span>
+          <div style="font-family:var(--fm);font-size:9px;color:var(--gris)">${r.temporada}</div>
+        </div>
+        <div style="font-family:var(--fm);font-size:11px;color:var(--gris);white-space:nowrap;margin-left:8px">tú: ${r.tuNota} · grupo: ${r.media.toFixed(2)}</div>
+      </div>`;
+    });
+    el.appendChild(rDiv);
+  }
+
+  // ---- AFINIDAD HISTÓRICA ENTRE MIEMBROS ----
+  const miembrosActivos=D.miembros.filter(m=>D.votos.filter(v=>v.miembro_id===m.id).length>5);
+  const pairsAll=[];
+  for(let i=0;i<miembrosActivos.length;i++){
+    for(let j=i+1;j<miembrosActivos.length;j++){
+      const m1=miembrosActivos[i], m2=miembrosActivos[j];
+      const v1=D.votos.filter(v=>v.miembro_id===m1.id);
+      const v2=D.votos.filter(v=>v.miembro_id===m2.id);
+      const common=v1.filter(a=>v2.some(b=>b.pelicula_id===a.pelicula_id));
+      if(common.length<5) continue;
+      const totalDiff=common.reduce((acc,a)=>{
+        const b=v2.find(x=>x.pelicula_id===a.pelicula_id);
+        return acc+Math.abs(a.nota-b.nota);
+      },0);
+      pairsAll.push({m1:m1.nombre,m2:m2.nombre,diff:totalDiff/common.length,n:common.length});
+    }
+  }
+  pairsAll.sort((a,b)=>a.diff-b.diff);
+  if(pairsAll.length){
+    const afDiv=document.createElement('div'); afDiv.style.marginBottom='28px';
+    afDiv.innerHTML='<div class="sec-label">Afinidad de gustos · histórico (mín. 5 pelis en común)</div><div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin-bottom:8px">Gustos más parecidos</div>';
+    pairsAll.slice(0,5).forEach(p=>{ afDiv.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fb);font-size:13px">${esc(p.m1)} & ${esc(p.m2)}</span><span style="font-family:var(--fm);font-size:11px;color:var(--rojo)">±${p.diff.toFixed(2)} · ${p.n} pelis</span></div>`; });
+    afDiv.innerHTML+='<div style="font-family:var(--fm);font-size:10px;color:var(--gris);margin:12px 0 8px">Gustos más opuestos</div>';
+    [...pairsAll].reverse().slice(0,5).forEach(p=>{ afDiv.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fb);font-size:13px">${esc(p.m1)} & ${esc(p.m2)}</span><span style="font-family:var(--fm);font-size:11px;color:var(--gris)">±${p.diff.toFixed(2)} · ${p.n} pelis</span></div>`; });
+    el.appendChild(afDiv);
+  }
+
+  // ---- ASISTENCIA HISTÓRICA ----
+  const asisAll={};
+  D.miembros.forEach(m=>asisAll[m.id]={nombre:m.nombre,n:0});
+  D.votos.forEach(v=>{ if(asisAll[v.miembro_id]) asisAll[v.miembro_id].n++; });
+  const asisOrd=Object.values(asisAll).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+  if(asisOrd.length){
+    const asDiv=document.createElement('div'); asDiv.style.marginBottom='28px';
+    asDiv.innerHTML=`<div class="sec-label">Asistencia histórica · ${D.pelis.length} películas en total</div>`;
+    const maxN=asisOrd[0].n;
+    asisOrd.forEach(({nombre,n})=>{
+      asDiv.innerHTML+=`<div class="bar-item"><div class="bar-row"><span class="bar-lbl">${esc(nombre)}</span><span class="bar-cnt">${n} pelis</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(n/maxN*100)}%"></div></div></div>`;
+    });
+    el.appendChild(asDiv);
+  }
+
+  // ---- MEDIA PERSONAL HISTÓRICA ----
+  const mediasPers=D.miembros.map(m=>{
+    const vv=D.votos.filter(v=>v.miembro_id===m.id);
+    if(vv.length<5) return null;
+    return {nombre:m.nombre,media:vv.reduce((a,b)=>a+b.nota,0)/vv.length,n:vv.length};
+  }).filter(x=>x).sort((a,b)=>b.media-a.media);
+  if(mediasPers.length){
+    const mpDiv=document.createElement('div'); mpDiv.style.marginBottom='28px';
+    mpDiv.innerHTML='<div class="sec-label">Media personal histórica (mín. 5 votos)</div>';
+    mediasPers.forEach(({nombre,media,n},i)=>{
+      const color=i===0?'var(--rojo)':i===mediasPers.length-1?'var(--gris)':'var(--crema2)';
+      const tag=i===0?' 🌟':i===mediasPers.length-1?' 🎯':'';
+      mpDiv.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--borde)"><span style="font-family:var(--fb);font-size:13px;color:${color}">${esc(nombre)}${tag}</span><span style="font-family:var(--fd);font-size:15px;font-weight:700">${media.toFixed(2)} <span style="font-family:var(--fm);font-size:10px;color:var(--gris)">${n} votos</span></span></div>`;
+    });
+    el.appendChild(mpDiv);
+  }
 }
 
 // ============ INIT ============
