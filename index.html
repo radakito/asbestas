@@ -14,7 +14,31 @@
   --fd:'Playfair Display',serif;--fb:'IBM Plex Sans',sans-serif;--fm:'IBM Plex Mono',monospace;
 }
 body{background:var(--negro);color:var(--crema);font-family:var(--fb);min-height:100vh;font-size:14px}
-@media(min-width:768px){body{font-size:16px}.peli-titulo{font-size:26px!important}.main{padding:32px 28px!important}}
+
+/* BASE SIZE INCREASE */
+body { font-size: 15px; }
+.h-title { font-size: 16px !important; }
+.h-nota { font-size: 22px !important; }
+.h-num { font-size: 26px !important; }
+.nav button { font-size: 14px !important; padding: 16px 18px !important; }
+.sec-label { font-size: 11px !important; }
+.meta { font-size: 12px !important; }
+.peli-titulo { font-size: 22px !important; }
+.main { padding: 28px 22px !important; }
+.h-item { padding: 16px 0 !important; }
+
+@media(min-width:768px){
+  body { font-size: 17px; }
+  .peli-titulo { font-size: 28px !important; }
+  .h-title { font-size: 18px !important; }
+  .h-nota { font-size: 24px !important; }
+  .h-num { font-size: 30px !important; }
+  .nav button { font-size: 15px !important; padding: 17px 20px !important; }
+  .main { padding: 36px 32px !important; max-width:760px !important; }
+  .stat-val { font-size: 34px !important; }
+  .logo { font-size: 26px !important; }
+  .det-media-n { font-size: 72px !important; }
+}
 
 /* HEADER */
 .header{border-bottom:1px solid var(--borde);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;background:var(--negro);z-index:100}
@@ -164,6 +188,19 @@ textarea.com-area::placeholder{color:var(--gris)}
 .pts-btn.active{border-color:#c8382a;background:rgba(200,56,42,.2);color:#c8382a}
 .pts-btn.disabled{opacity:.35;cursor:not-allowed}
 .pts-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(240,234,216,.1)}
+
+/* SABIA QUE */
+.sabia-card{border:1px solid rgba(200,56,42,.3);border-radius:4px;background:linear-gradient(135deg,rgba(200,56,42,.06) 0%,rgba(13,13,13,0) 100%);padding:20px;margin-top:8px;min-height:120px;position:relative;overflow:hidden}
+.sabia-label{font-family:var(--fm);font-size:10px;color:var(--rojo);letter-spacing:.15em;text-transform:uppercase;margin-bottom:12px;opacity:.8}
+.sabia-inner{display:flex;align-items:center;gap:16px}
+.sabia-poster{width:60px;height:90px;border-radius:3px;overflow:hidden;flex-shrink:0;background:var(--gris2);transition:opacity .5s}
+.sabia-poster img{width:100%;height:100%;object-fit:cover;display:block}
+.sabia-text{font-family:var(--fd);font-size:17px;line-height:1.5;color:var(--crema);flex:1}
+@media(min-width:768px){.sabia-text{font-size:20px;} .sabia-card{padding:24px;min-height:140px;}}
+.sabia-fade-enter{animation:sabiaIn .7s ease forwards}
+.sabia-fade-exit{animation:sabiaOut .5s ease forwards}
+@keyframes sabiaIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sabiaOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-8px)}}
 
 /* MISC */
 .divider{border:none;border-top:1px solid var(--borde);margin:20px 0}
@@ -599,14 +636,17 @@ function renderInicio(){
 
   // ¿Sabías que? block
   const sabiaWrap=document.createElement('div');
-  sabiaWrap.style.cssText='border:1px solid var(--borde);border-radius:3px;padding:18px;margin-top:8px';
-  const sabiaEl=document.createElement('div');
-  sabiaEl.id='sabia-que';
-  sabiaEl.style.cssText='font-family:var(--fb);font-size:13px;color:var(--crema2);line-height:1.6;transition:opacity .6s;opacity:0;min-height:48px';
-  sabiaWrap.appendChild(sabiaEl);
+  sabiaWrap.className='sabia-card';
+  sabiaWrap.id='sabia-card';
+  sabiaWrap.innerHTML=`
+    <div class="sabia-label">¿Sabías que…?</div>
+    <div class="sabia-inner">
+      <div class="sabia-poster"></div>
+      <div class="sabia-text"></div>
+    </div>`;
   el.appendChild(sabiaWrap);
   if(sabiaTimer) clearInterval(sabiaTimer);
-  setTimeout(iniciarSabias, 300);
+  setTimeout(iniciarSabias, 400);
 }
 
 // ============ RENDER VOTA ============
@@ -1361,17 +1401,37 @@ function renderAdmin(){
     const info=document.createElement('div'); info.style.cssText='font-family:var(--fm);font-size:11px;color:var(--gris);margin-bottom:12px';
     info.textContent='Temporada activa: '+TEMPORADA;
     s.appendChild(info);
-    const nextTemp=TEMPORADA==='2025-26'?'2026-27':TEMPORADA==='2026-27'?'2027-28':'siguiente';
-    const tBtn=document.createElement('button'); tBtn.className='btn-rojo'; tBtn.textContent='Activar temporada '+nextTemp;
-    tBtn.addEventListener('click',async()=>{
-      if(!confirm('¿Activar '+nextTemp+'? Inicio y Vota! mostrarán la nueva temporada.')) return;
-      try{
-        await fetch(`${SB}/rest/v1/ranking_config?key=eq.temporada_activa`,{method:'DELETE',headers:{'apikey':SK,'Authorization':'Bearer '+SK}});
-        await dbPost('ranking_config',{key:'temporada_activa',value:nextTemp});
-        toast('¡Temporada '+nextTemp+' activada!'); await loadAll(); renderAll();
-      }catch(e){ toast('Error: '+e.message); }
-    });
-    s.appendChild(tBtn);
+    const tempList=['2022-23','2023-24','2024-25','2025-26','2026-27','2027-28'];
+    const curIdx=tempList.indexOf(TEMPORADA);
+    const nextTemp=curIdx<tempList.length-1?tempList[curIdx+1]:null;
+    const prevTemp=curIdx>0?tempList[curIdx-1]:null;
+
+    if(nextTemp){
+      const tBtn=document.createElement('button'); tBtn.className='btn-rojo'; tBtn.style.marginBottom='8px'; tBtn.style.display='block'; tBtn.style.width='100%';
+      tBtn.textContent='→ Activar temporada '+nextTemp;
+      tBtn.addEventListener('click',async()=>{
+        if(!confirm('¿Activar '+nextTemp+'?')) return;
+        try{
+          await fetch(`${SB}/rest/v1/ranking_config?key=eq.temporada_activa`,{method:'DELETE',headers:{'apikey':SK,'Authorization':'Bearer '+SK}});
+          await dbPost('ranking_config',{key:'temporada_activa',value:nextTemp});
+          toast('¡Temporada '+nextTemp+' activada!'); await loadAll(); renderAll();
+        }catch(e){ toast('Error: '+e.message); }
+      });
+      s.appendChild(tBtn);
+    }
+    if(prevTemp){
+      const pBtn=document.createElement('button'); pBtn.className='btn-borde'; pBtn.style.marginBottom='0';
+      pBtn.textContent='← Volver a temporada '+prevTemp;
+      pBtn.addEventListener('click',async()=>{
+        if(!confirm('¿Volver a '+prevTemp+'?')) return;
+        try{
+          await fetch(`${SB}/rest/v1/ranking_config?key=eq.temporada_activa`,{method:'DELETE',headers:{'apikey':SK,'Authorization':'Bearer '+SK}});
+          await dbPost('ranking_config',{key:'temporada_activa',value:prevTemp});
+          toast('Temporada '+prevTemp+' activada'); await loadAll(); renderAll();
+        }catch(e){ toast('Error: '+e.message); }
+      });
+      s.appendChild(pBtn);
+    }
   });
 
   // SECTION 2: Revelaciones
@@ -1827,16 +1887,19 @@ document.getElementById('fest-ok').addEventListener('click', async()=>{
 
 
 // ============ ¿SABÍAS QUE? ============
+function sabiaItem(texto, peli=null){
+  return {texto, posterUrl: peli?.poster_url||null};
+}
+
 function generarSabias(){
   const datos = [];
-  const pelis = D.pelis.filter(p=>p.temporada===TEMPORADA);
 
   // Votos extremos
   D.votos.forEach(v=>{
     const p=D.pelis.find(x=>x.id===v.pelicula_id); if(!p) return;
     const nombre=nombreM(v.miembro_id); if(nombre==='?') return;
-    if(v.nota===10) datos.push(`${nombre} le puso un <strong>10</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' ('+p.temporada+')':''}`);
-    if(v.nota<=2) datos.push(`${nombre} le puso un <strong>${v.nota}</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' ('+p.temporada+')':''}`);
+    if(v.nota===10) datos.push(sabiaItem(`<strong>${nombre}</strong> le puso un <strong style="color:var(--rojo)">10</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
+    if(v.nota<=2) datos.push(sabiaItem(`<strong>${nombre}</strong> le puso un <strong style="color:var(--gris)">${v.nota}</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
   });
 
   // Mayor discrepancia individual
@@ -1857,7 +1920,7 @@ function generarSabias(){
     const std=Math.sqrt(vv.reduce((a,b)=>a+Math.pow(b.nota-m,2),0)/vv.length);
     return {...p,std,min:Math.min(...vv.map(v=>v.nota)),max:Math.max(...vv.map(v=>v.nota))};
   }).filter(x=>x).sort((a,b)=>b.std-a.std)[0];
-  if(divMax) datos.push(`<em>${esc(divMax.titulo)}</em> es la película que más ha dividido al grupo: notas de <strong>${divMax.min}</strong> a <strong>${divMax.max}</strong>`);
+  if(divMax) datos.push(sabiaItem(`<em>${esc(divMax.titulo)}</em> es la película que más ha dividido al grupo: notas de <strong>${divMax.min}</strong> a <strong>${divMax.max}</strong>`,divMax));
 
   // Peli más unánime
   const conMax=D.pelis.map(p=>{
@@ -1866,7 +1929,7 @@ function generarSabias(){
     const std=Math.sqrt(vv.reduce((a,b)=>a+Math.pow(b.nota-m,2),0)/vv.length);
     return {...p,std};
   }).filter(x=>x).sort((a,b)=>a.std-b.std)[0];
-  if(conMax) datos.push(`<em>${esc(conMax.titulo)}</em> es la película sobre la que más ha coincidido el grupo en toda la historia`);
+  if(conMax) datos.push(sabiaItem(`<em>${esc(conMax.titulo)}</em> es la película sobre la que más ha coincidido el grupo en toda la historia`,conMax));
 
   // Parejas más y menos afines
   const miembrosV=D.miembros.filter(m=>D.votos.filter(v=>v.miembro_id===m.id).length>5);
@@ -1883,15 +1946,15 @@ function generarSabias(){
       if(diff>maxDiff){maxDiff=diff;maxPar=[m1.nombre,m2.nombre];}
     }
   }
-  if(minPar) datos.push(`<strong>${esc(minPar[0])}</strong> y <strong>${esc(minPar[1])}</strong> son la pareja con gustos más parecidos de toda la historia del club`);
-  if(maxPar) datos.push(`<strong>${esc(maxPar[0])}</strong> y <strong>${esc(maxPar[1])}</strong> son la pareja que más discrepa en gustos`);
+  if(minPar) datos.push(sabiaItem(`<strong>${esc(minPar[0])}</strong> y <strong>${esc(minPar[1])}</strong> son la pareja con gustos más parecidos de toda la historia del club`));
+  if(maxPar) datos.push(sabiaItem(`<strong>${esc(maxPar[0])}</strong> y <strong>${esc(maxPar[1])}</strong> son la pareja que más discrepa en gustos`));
 
   // Cartel favorito histórico por persona
   D.miembros.forEach(m=>{
     const myCV=D.cv.filter(v=>v.miembro_id===m.id&&v.posicion===1);
     if(!myCV.length) return;
     const p=D.pelis.find(x=>x.id===myCV[0].pelicula_id); if(!p) return;
-    datos.push(`El cartel favorito de <strong>${esc(m.nombre)}</strong> es el de <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' ('+p.temporada+')':''}`);
+    datos.push(sabiaItem(`El cartel favorito de <strong>${esc(m.nombre)}</strong> es el de <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
   });
 
   // Tertulia favorita histórica por persona
@@ -1899,18 +1962,18 @@ function generarSabias(){
     const myTV=D.tv.filter(v=>v.miembro_id===m.id&&v.posicion===1);
     if(!myTV.length) return;
     const p=D.pelis.find(x=>x.id===myTV[0].pelicula_id); if(!p) return;
-    datos.push(`La tertulia favorita de <strong>${esc(m.nombre)}</strong> es la de <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' ('+p.temporada+')':''}`);
+    datos.push(sabiaItem(`La tertulia favorita de <strong>${esc(m.nombre)}</strong> es la de <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
   });
 
   // Peli más larga
   const masLarga=D.pelis.filter(p=>p.duracion).sort((a,b)=>b.duracion-a.duracion)[0];
-  if(masLarga) datos.push(`La película más larga que habéis visto es <em>${esc(masLarga.titulo)}</em> con <strong>${fmtDur(masLarga.duracion)}</strong>`);
+  if(masLarga) datos.push(sabiaItem(`La película más larga que habéis visto es <em>${esc(masLarga.titulo)}</em> con <strong>${fmtDur(masLarga.duracion)}</strong>`,masLarga));
 
   // Director más repetido
   const dirs={};
   D.pelis.forEach(p=>{if(p.director)dirs[p.director]=(dirs[p.director]||0)+1;});
   const topDir=Object.entries(dirs).sort((a,b)=>b[1]-a[1])[0];
-  if(topDir&&topDir[1]>1) datos.push(`<strong>${esc(topDir[0])}</strong> es el director/a que más veces habéis visto — <strong>${topDir[1]} películas</strong>`);
+  if(topDir&&topDir[1]>1) datos.push(sabiaItem(`<strong>${esc(topDir[0])}</strong> es el director/a que más veces habéis visto — <strong>${topDir[1]} películas</strong>`));
 
   // Persona más generosa históricamente
   const mediasH=D.miembros.map(m=>{
@@ -1918,39 +1981,56 @@ function generarSabias(){
     if(vv.length<5) return null;
     return {nombre:m.nombre,media:vv.reduce((a,b)=>a+b.nota,0)/vv.length};
   }).filter(x=>x).sort((a,b)=>b.media-a.media);
-  if(mediasH.length) datos.push(`<strong>${esc(mediasH[0].nombre)}</strong> es la persona más generosa del club con una media histórica de <strong>${mediasH[0].media.toFixed(2)}</strong>`);
-  if(mediasH.length>1) datos.push(`<strong>${esc(mediasH[mediasH.length-1].nombre)}</strong> es la persona más exigente del club con una media histórica de <strong>${mediasH[mediasH.length-1].media.toFixed(2)}</strong>`);
+  if(mediasH.length) datos.push(sabiaItem(`<strong>${esc(mediasH[0].nombre)}</strong> es la persona más generosa del club con una media histórica de <strong>${mediasH[0].media.toFixed(2)}</strong>`));
+  if(mediasH.length>1) datos.push(sabiaItem(`<strong>${esc(mediasH[mediasH.length-1].nombre)}</strong> es la persona más exigente del club con una media histórica de <strong>${mediasH[mediasH.length-1].media.toFixed(2)}</strong>`));
 
   // Horas totales de cine
   const totalMin=D.pelis.reduce((a,p)=>a+(p.duracion||0),0);
-  if(totalMin>0) datos.push(`En total habéis visto <strong>${Math.floor(totalMin/60)} horas y ${totalMin%60} minutos</strong> de cine juntos`);
+  if(totalMin>0) datos.push(sabiaItem(`En total habéis visto <strong>${Math.floor(totalMin/60)} horas y ${totalMin%60} minutos</strong> de cine juntos`));
 
   return datos;
 }
 
 function mostrarSabia(datos, idx){
-  const el=document.getElementById('sabia-que');
-  if(!el||!datos.length) return;
-  el.innerHTML='<span style="color:var(--rojo);font-family:var(--fm);font-size:10px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:8px">¿Sabías que…?</span>'+datos[idx%datos.length];
-  el.style.opacity='1';
+  const card=document.getElementById('sabia-card');
+  if(!card||!datos.length) return;
+  const item=datos[idx%datos.length];
+  const inner=card.querySelector('.sabia-inner');
+  const posterEl=card.querySelector('.sabia-poster');
+  const textEl=card.querySelector('.sabia-text');
+  if(!inner||!posterEl||!textEl) return;
+
+  // Remove exit animation class and add enter
+  inner.classList.remove('sabia-fade-enter','sabia-fade-exit');
+  void inner.offsetWidth; // force reflow
+  inner.classList.add('sabia-fade-enter');
+
+  // Set poster
+  if(item.posterUrl){
+    posterEl.innerHTML=`<img src="${item.posterUrl}" alt="">`;
+    posterEl.style.display='block';
+  } else {
+    posterEl.style.display='none';
+  }
+  textEl.innerHTML=item.texto;
 }
 
 let sabiaIdx=0, sabiaData=[], sabiaTimer=null;
 function iniciarSabias(){
   sabiaData=generarSabias();
   if(!sabiaData.length) return;
-  // Shuffle
   sabiaData=sabiaData.sort(()=>Math.random()-.5);
-  mostrarSabia(sabiaData,sabiaIdx);
+  mostrarSabia(sabiaData,0);
   sabiaTimer=setInterval(()=>{
-    const el=document.getElementById('sabia-que');
-    if(!el) return;
-    el.style.opacity='0';
+    const inner=document.querySelector('#sabia-card .sabia-inner');
+    if(!inner) return;
+    inner.classList.remove('sabia-fade-enter');
+    inner.classList.add('sabia-fade-exit');
     setTimeout(()=>{
       sabiaIdx=(sabiaIdx+1)%sabiaData.length;
       mostrarSabia(sabiaData,sabiaIdx);
-    },600);
-  },8000);
+    },500);
+  },9000);
 }
 
 // ============ ESTADÍSTICAS COMPARATIVAS ============
