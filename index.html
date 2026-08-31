@@ -345,6 +345,8 @@ const SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 const TK = '12e800990f66a67d30314bf0b48dcb72';
 const TI = 'https://image.tmdb.org/t/p/w200';
 const ADMINS = ['Mon'];
+const CINES_DEFAULT = ['Golem','Renoir Princesa','Renoir Plaza de España','Ideal','Sala Equis','Embajadores','Doré','Cineteca','Círculo de Bellas Artes'];
+let CINES_HABITUALES = [...CINES_DEFAULT, ...JSON.parse(localStorage.getItem('ab_cines')||'[]').filter(c=>!CINES_DEFAULT.includes(c))];
 const TEMPORADAS = ['2025-26','2024-25','2023-24','2022-23'];
 let temporadaVista = '2025-26';
 let TEMPORADA = '2025-26'; // overridden by DB config if set
@@ -1505,7 +1507,7 @@ function renderAdmin(){
       ['Género(s)','ef-genero',p.genero||'','text'],
       ['Nota FilmAffinity','ef-fanota',p.fa_nota||'','number'],['Enlace FilmAffinity','ef-fa',p.filmaffinity_url||'','text'],
       ['URL Póster','ef-poster',p.poster_url||'','text'],
-      ['Cine','ef-cine',p.cine||'','text'],
+      // Cine handled separately below
       ['Lugar de la tertulia','ef-lugar',p.lugar_tertulia||'','text']
     ];
     fields.forEach(([lbl,id,val,type])=>{
@@ -1521,6 +1523,39 @@ function renderAdmin(){
       const o=document.createElement('option'); o.value=v; o.textContent=t; if((p.genero_director||'')=== v) o.selected=true; sel.appendChild(o);
     });
     editBox.appendChild(sel);
+
+    // Cine select
+    const cineLbl=document.createElement('label'); cineLbl.className='form-lbl'; cineLbl.textContent='Cine'; editBox.appendChild(cineLbl);
+    const cineSel=document.createElement('select'); cineSel.id='ef-cine-'+p.id;
+    cineSel.style.cssText='width:100%;background:#111;border:1px solid var(--borde);color:var(--crema);font-family:var(--fb);font-size:13px;padding:8px 10px;border-radius:2px;outline:none;margin-bottom:4px';
+    const cineOpts=['', ...CINES_HABITUALES, '__otro__'];
+    cineOpts.forEach(cv=>{
+      const o=document.createElement('option');
+      o.value=cv==='__otro__'?'':cv;
+      o.textContent=cv===''?'Sin asignar':cv==='__otro__'?'+ Otro cine...':cv;
+      if((p.cine||'')=== cv) o.selected=true;
+      cineSel.appendChild(o);
+    });
+    // If current cine not in list, add it
+    if(p.cine && !CINES_HABITUALES.includes(p.cine)){
+      const o=document.createElement('option'); o.value=p.cine; o.textContent=p.cine; o.selected=true;
+      cineSel.insertBefore(o, cineSel.lastChild);
+    }
+    const cineNuevoInp=document.createElement('input'); cineNuevoInp.id='ef-cine-nuevo-'+p.id;
+    cineNuevoInp.placeholder='Nombre del cine'; cineNuevoInp.style.cssText='width:100%;background:#111;border:1px solid var(--borde);color:var(--crema);font-family:var(--fb);font-size:13px;padding:8px 10px;border-radius:2px;outline:none;margin-bottom:8px;display:none';
+    cineSel.addEventListener('change',()=>{
+      if(cineSel.value===''){
+        cineNuevoInp.style.display='block'; cineNuevoInp.focus();
+        // Override ef-cine value with input
+        cineSel.id='ef-cine-sel-'+p.id;
+        cineNuevoInp.id='ef-cine-'+p.id;
+      } else {
+        cineNuevoInp.style.display='none';
+        cineSel.id='ef-cine-'+p.id;
+        cineNuevoInp.id='ef-cine-nuevo-'+p.id;
+      }
+    });
+    editBox.appendChild(cineSel); editBox.appendChild(cineNuevoInp);
 
     // Propuesto por
     const propLbl=document.createElement('label'); propLbl.className='form-lbl'; propLbl.textContent='Propuesta por'; editBox.appendChild(propLbl);
@@ -1557,14 +1592,34 @@ function renderAdmin(){
     sv.addEventListener('click', async()=>{
       try{
         const fanota=parseFloat(document.getElementById('ef-fanota-'+p.id).value)||null;
+        const cineVal=document.getElementById('ef-cine-'+p.id)?.value.trim()||null;
+        const lugarVal=document.getElementById('ef-lugar-'+p.id)?.value.trim()||null;
+        const propVal=document.getElementById('ef-prop-'+p.id)?.value||null;
+        const posterVal=document.getElementById('ef-poster-'+p.id)?.value.trim()||null;
+        const generoVal=document.getElementById('ef-genero-'+p.id)?.value.trim()||null;
+        const cbChecked=[...document.querySelectorAll('.asistencia-cb-'+p.id+':checked')].map(cb=>cb.dataset.mid);
+        const invText=document.getElementById('ef-invitados-'+p.id)?.value.trim()||'';
+        const invitados=invText?invText.split(',').map(s=>'__'+s.trim()).filter(s=>s.length>2):[];
+        const asistencia=[...cbChecked,...invitados];
+        // Save new cinema to localStorage list
+        if(cineVal && !CINES_HABITUALES.includes(cineVal)){
+          CINES_HABITUALES.push(cineVal);
+          localStorage.setItem('ab_cines',JSON.stringify(CINES_HABITUALES));
+        }
         await dbPatch('peliculas',`id=eq.${p.id}`,{
           titulo:document.getElementById('ef-titulo-'+p.id).value.trim(),
           director:document.getElementById('ef-dir-'+p.id).value.trim()||null,
           fecha_sesion:document.getElementById('ef-fecha-'+p.id).value||null,
           pais:document.getElementById('ef-pais-'+p.id).value.trim()||null,
+          genero:generoVal,
           fa_nota:fanota,
           filmaffinity_url:document.getElementById('ef-fa-'+p.id).value.trim()||null,
-          genero_director:document.getElementById('ef-gendir-'+p.id).value||null
+          genero_director:document.getElementById('ef-gendir-'+p.id).value||null,
+          poster_url:posterVal,
+          cine:cineVal,
+          lugar_tertulia:lugarVal,
+          propuesto_por:propVal||null,
+          asistencia:asistencia.length?asistencia:null
         });
         toast('Guardado'); await loadAll(); renderAll();
       }catch(e){ toast('Error: '+e.message); }
