@@ -1288,6 +1288,8 @@ document.getElementById('mv-ok').addEventListener('click', async()=>{
     if(existing) await dbDel('votos',`id=eq.${existing.id}`);
     await dbPost('votos',{pelicula_id:peliVotando.id,miembro_id:ME.id,nota});
     hideModal('m-votar'); toast('Voto: '+nota+'/10');
+    btn.disabled=false; btn.textContent='Confirmar voto';
+    peliVotando=null;
     await loadAll(); renderAll();
   }catch(e){ toast('Error: '+e.message); btn.disabled=false; btn.textContent='Confirmar voto'; }
 });
