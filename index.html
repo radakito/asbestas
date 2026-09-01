@@ -1382,6 +1382,26 @@ document.getElementById('m-ok').addEventListener('click', async()=>{
 });
 
 // ============ ADMIN ============
+function makeCandRow(pelId, idx, titulo, propuestaPor){
+  const row=document.createElement('div');
+  row.style.cssText='display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center';
+  const tIn=document.createElement('input'); tIn.placeholder='Título'; tIn.value=titulo||''; tIn.className='cand-titulo-'+pelId;
+  tIn.style.cssText='background:#111;border:1px solid var(--borde);color:var(--crema);font-family:var(--fb);font-size:12px;padding:7px 9px;border-radius:2px;outline:none;width:100%';
+  const pSel=document.createElement('select'); pSel.className='cand-prop-'+pelId;
+  pSel.style.cssText='background:#111;border:1px solid var(--borde);color:var(--crema);font-family:var(--fb);font-size:12px;padding:7px 9px;border-radius:2px;outline:none;width:100%';
+  const emptyOpt=document.createElement('option'); emptyOpt.value=''; emptyOpt.textContent='Quién la propuso'; pSel.appendChild(emptyOpt);
+  D.miembros.forEach(m=>{
+    const o=document.createElement('option'); o.value=m.id; o.textContent=m.nombre;
+    if(propuestaPor===m.id) o.selected=true;
+    pSel.appendChild(o);
+  });
+  const delBtn=document.createElement('button'); delBtn.textContent='✕';
+  delBtn.style.cssText='background:none;border:1px solid rgba(200,56,42,.3);color:var(--rojo);font-size:12px;padding:6px 9px;border-radius:2px;cursor:pointer;flex-shrink:0';
+  delBtn.addEventListener('click',()=>row.remove());
+  row.appendChild(tIn); row.appendChild(pSel); row.appendChild(delBtn);
+  return row;
+}
+
 function makeAdminSection(el, title, buildFn){
   const wrap=document.createElement('div'); wrap.style.marginBottom='16px';
   const hdr=document.createElement('div');
