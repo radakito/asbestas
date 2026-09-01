@@ -1967,6 +1967,43 @@ document.getElementById('fest-ok').addEventListener('click', async()=>{
 
 
 // ============ ¿SABÍAS QUE? ============
+function mostrarSabia(datos, idx){
+  const card=document.getElementById('sabia-card');
+  if(!card||!datos.length) return;
+  const item=datos[idx%datos.length];
+  const inner=card.querySelector('.sabia-inner');
+  const posterEl=card.querySelector('.sabia-poster');
+  const textEl=card.querySelector('.sabia-text');
+  if(!inner||!posterEl||!textEl) return;
+  inner.classList.remove('sabia-fade-enter','sabia-fade-exit');
+  void inner.offsetWidth;
+  inner.classList.add('sabia-fade-enter');
+  if(item.posterUrl){
+    posterEl.innerHTML=`<img src="${item.posterUrl}" alt="">`;
+    posterEl.style.display='block';
+  } else {
+    posterEl.style.display='none';
+  }
+  textEl.innerHTML=item.texto;
+}
+
+function iniciarSabias(){
+  sabiaData=generarSabias();
+  if(!sabiaData.length) return;
+  sabiaData=sabiaData.sort(()=>Math.random()-.5);
+  mostrarSabia(sabiaData,0);
+  sabiaTimer=setInterval(()=>{
+    const inner=document.querySelector('#sabia-card .sabia-inner');
+    if(!inner) return;
+    inner.classList.remove('sabia-fade-enter');
+    inner.classList.add('sabia-fade-exit');
+    setTimeout(()=>{
+      sabiaIdx=(sabiaIdx+1)%sabiaData.length;
+      mostrarSabia(sabiaData,sabiaIdx);
+    },500);
+  },9000);
+}
+
 function sabiaItem(texto, peli=null){
   return {texto, posterUrl: peli?.poster_url||null};
 }
