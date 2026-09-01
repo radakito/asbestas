@@ -1587,6 +1587,23 @@ function renderAdmin(){
     invInput.value=invActuales;
     editBox.appendChild(invInput);
 
+    // Candidatas no elegidas
+    const candLbl=document.createElement('label'); candLbl.className='form-lbl'; candLbl.style.marginTop='8px'; candLbl.textContent='Otras candidatas de la semana'; editBox.appendChild(candLbl);
+    const candContainer=document.createElement('div'); candContainer.id='cand-list-'+p.id;
+    const candidatasActuales=p.candidatas||[];
+    candidatasActuales.forEach((cand,ci)=>{
+      const row=makeCandRow(p.id, ci, cand.titulo||'', cand.propuesta_por||'');
+      candContainer.appendChild(row);
+    });
+    editBox.appendChild(candContainer);
+    const addCandBtn=document.createElement('button'); addCandBtn.className='btn-borde'; addCandBtn.style.marginBottom='8px'; addCandBtn.textContent='+ Añadir candidata';
+    addCandBtn.addEventListener('click',()=>{
+      const list=document.getElementById('cand-list-'+p.id);
+      const idx=list.children.length;
+      list.appendChild(makeCandRow(p.id, idx, '', ''));
+    });
+    editBox.appendChild(addCandBtn);
+
     const eRow=document.createElement('div'); eRow.className='edit-row';
     const sv=document.createElement('button'); sv.className='sv'; sv.textContent='Guardar';
     sv.addEventListener('click', async()=>{
@@ -1606,6 +1623,10 @@ function renderAdmin(){
           CINES_HABITUALES.push(cineVal);
           localStorage.setItem('ab_cines',JSON.stringify(CINES_HABITUALES));
         }
+        // Collect candidatas
+        const candTitulos=[...document.querySelectorAll('.cand-titulo-'+p.id)];
+        const candProps=[...document.querySelectorAll('.cand-prop-'+p.id)];
+        const candidatas=candTitulos.map((t,i)=>({titulo:t.value.trim(),propuesta_por:candProps[i]?.value||''})).filter(x=>x.titulo);
         await dbPatch('peliculas',`id=eq.${p.id}`,{
           titulo:document.getElementById('ef-titulo-'+p.id).value.trim(),
           director:document.getElementById('ef-dir-'+p.id).value.trim()||null,
@@ -1619,7 +1640,8 @@ function renderAdmin(){
           cine:cineVal,
           lugar_tertulia:lugarVal,
           propuesto_por:propVal||null,
-          asistencia:asistencia.length?asistencia:null
+          asistencia:asistencia.length?asistencia:null,
+          candidatas:candidatas.length?candidatas:null
         });
         toast('Guardado'); await loadAll(); renderAll();
       }catch(e){ toast('Error: '+e.message); }
@@ -1951,49 +1973,46 @@ function sabiaItem(texto, peli=null){
 function generarSabias(){
   const datos = [];
 
-  // Votos extremos
+  // Votos extremos - safe
   D.votos.forEach(v=>{
     const p=D.pelis.find(x=>x.id===v.pelicula_id); if(!p) return;
-    const nombre=nombreM(v.miembro_id); if(nombre==='?') return;
-    if(v.nota===10) datos.push(sabiaItem(`<strong>${nombre}</strong> le puso un <strong style="color:var(--rojo)">10</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
-    if(v.nota<=2) datos.push(sabiaItem(`<strong>${nombre}</strong> le puso un <strong style="color:var(--gris)">${v.nota}</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
+    const nombre=nombreM(v.miembro_id); if(!nombre||nombre==='?') return;
+    if(v.nota===10) datos.push(sabiaItem(`<strong>${esc(nombre)}</strong> le puso un <strong style="color:var(--rojo)">10</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
+    if(v.nota<=2) datos.push(sabiaItem(`<strong>${esc(nombre)}</strong> le puso un <strong style="color:var(--gris)">${v.nota}</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
   });
 
-  // Mayor discrepancia individual
+  // Mayor discrepancia individual - safe
   D.pelis.forEach(p=>{
     const media=mediaP(p.id); if(!media) return;
     const mNum=parseFloat(media);
     votosP(p.id).forEach(v=>{
       const diff=Math.abs(v.nota-mNum);
-      const nombre=nombreM(v.miembro_id); if(nombre==='?') return;
-      if(diff>=3) datos.push(`${nombre} votó <em>${esc(p.titulo)}</em> con un <strong>${v.nota}</strong>, mientras el grupo le puso un <strong>${mNum.toFixed(1)}</strong>`);
+      const nombre=nombreM(v.miembro_id); if(!nombre||nombre==='?') return;
+      if(diff>=3) datos.push(sabiaItem(`<strong>${esc(nombre)}</strong> votó <em>${esc(p.titulo)}</em> con un <strong>${v.nota}</strong>, el grupo le puso un <strong>${mNum.toFixed(1)}</strong>`,p));
     });
   });
 
-  // Peli más divisiva
-  const divMax=D.pelis.map(p=>{
+  // Peli más divisiva - safe
+  const consensoAll=D.pelis.map(p=>{
     const vv=votosP(p.id); if(vv.length<4) return null;
     const m=vv.reduce((a,b)=>a+b.nota,0)/vv.length;
     const std=Math.sqrt(vv.reduce((a,b)=>a+Math.pow(b.nota-m,2),0)/vv.length);
     return {...p,std,min:Math.min(...vv.map(v=>v.nota)),max:Math.max(...vv.map(v=>v.nota))};
-  }).filter(x=>x).sort((a,b)=>b.std-a.std)[0];
-  if(divMax) datos.push(sabiaItem(`<em>${esc(divMax.titulo)}</em> es la película que más ha dividido al grupo: notas de <strong>${divMax.min}</strong> a <strong>${divMax.max}</strong>`,divMax));
+  }).filter(x=>x);
 
-  // Peli más unánime
-  const conMax=D.pelis.map(p=>{
-    const vv=votosP(p.id); if(vv.length<4) return null;
-    const m=vv.reduce((a,b)=>a+b.nota,0)/vv.length;
-    const std=Math.sqrt(vv.reduce((a,b)=>a+Math.pow(b.nota-m,2),0)/vv.length);
-    return {...p,std};
-  }).filter(x=>x).sort((a,b)=>a.std-b.std)[0];
-  if(conMax) datos.push(sabiaItem(`<em>${esc(conMax.titulo)}</em> es la película sobre la que más ha coincidido el grupo en toda la historia`,conMax));
+  const divMax=consensoAll.sort((a,b)=>b.std-a.std)[0];
+  if(divMax&&divMax.titulo) datos.push(sabiaItem(`<em>${esc(divMax.titulo)}</em> es la película que más ha dividido al grupo: notas de <strong>${divMax.min}</strong> a <strong>${divMax.max}</strong>`,divMax));
 
-  // Parejas más y menos afines
+  const conMax=consensoAll.sort((a,b)=>a.std-b.std)[0];
+  if(conMax&&conMax.titulo) datos.push(sabiaItem(`<em>${esc(conMax.titulo)}</em> es la película sobre la que más ha coincidido el grupo en toda la historia`,conMax));
+
+  // Pares - safe
   const miembrosV=D.miembros.filter(m=>D.votos.filter(v=>v.miembro_id===m.id).length>5);
   let minDiff=999,maxDiff=0,minPar=null,maxPar=null;
   for(let i=0;i<miembrosV.length;i++){
     for(let j=i+1;j<miembrosV.length;j++){
       const m1=miembrosV[i],m2=miembrosV[j];
+      if(!m1?.nombre||!m2?.nombre) continue;
       const v1=D.votos.filter(v=>v.miembro_id===m1.id);
       const v2=D.votos.filter(v=>v.miembro_id===m2.id);
       const common=v1.filter(a=>v2.some(b=>b.pelicula_id===a.pelicula_id));
@@ -2003,92 +2022,66 @@ function generarSabias(){
       if(diff>maxDiff){maxDiff=diff;maxPar=[m1.nombre,m2.nombre];}
     }
   }
-  if(minPar) datos.push(sabiaItem(`<strong>${esc(minPar[0])}</strong> y <strong>${esc(minPar[1])}</strong> son la pareja con gustos más parecidos de toda la historia del club`));
-  if(maxPar) datos.push(sabiaItem(`<strong>${esc(maxPar[0])}</strong> y <strong>${esc(maxPar[1])}</strong> son la pareja que más discrepa en gustos`));
+  if(minPar&&minPar[0]&&minPar[1]) datos.push(sabiaItem(`<strong>${esc(minPar[0])}</strong> y <strong>${esc(minPar[1])}</strong> son la pareja con gustos más parecidos de toda la historia del club`));
+  if(maxPar&&maxPar[0]&&maxPar[1]) datos.push(sabiaItem(`<strong>${esc(maxPar[0])}</strong> y <strong>${esc(maxPar[1])}</strong> son la pareja que más discrepa en gustos`));
 
-  // Cartel favorito histórico por persona
+  // Cartel favorito - safe
   D.miembros.forEach(m=>{
+    if(!m?.nombre) return;
     const myCV=D.cv.filter(v=>v.miembro_id===m.id&&v.posicion===1);
     if(!myCV.length) return;
-    const p=D.pelis.find(x=>x.id===myCV[0].pelicula_id); if(!p) return;
+    const p=D.pelis.find(x=>x.id===myCV[0].pelicula_id); if(!p?.titulo) return;
     datos.push(sabiaItem(`El cartel favorito de <strong>${esc(m.nombre)}</strong> es el de <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
   });
 
-  // Tertulia favorita histórica por persona
+  // Tertulia favorita - safe
   D.miembros.forEach(m=>{
+    if(!m?.nombre) return;
     const myTV=D.tv.filter(v=>v.miembro_id===m.id&&v.posicion===1);
     if(!myTV.length) return;
-    const p=D.pelis.find(x=>x.id===myTV[0].pelicula_id); if(!p) return;
+    const p=D.pelis.find(x=>x.id===myTV[0].pelicula_id); if(!p?.titulo) return;
     datos.push(sabiaItem(`La tertulia favorita de <strong>${esc(m.nombre)}</strong> es la de <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
   });
 
-  // Peli más larga
-  const masLarga=D.pelis.filter(p=>p.duracion).sort((a,b)=>b.duracion-a.duracion)[0];
+  // Estadísticos - safe
+  const masLarga=D.pelis.filter(p=>p?.duracion&&p?.titulo).sort((a,b)=>b.duracion-a.duracion)[0];
   if(masLarga) datos.push(sabiaItem(`La película más larga que habéis visto es <em>${esc(masLarga.titulo)}</em> con <strong>${fmtDur(masLarga.duracion)}</strong>`,masLarga));
 
-  // Director más repetido
   const dirs={};
-  D.pelis.forEach(p=>{if(p.director)dirs[p.director]=(dirs[p.director]||0)+1;});
-  const topDir=Object.entries(dirs).sort((a,b)=>b[1]-a[1])[0];
+  D.pelis.forEach(p=>{if(p?.director&&p?.titulo)dirs[p.director]=(dirs[p.director]||0)+1;});
+  const topDir=Object.entries(dirs).filter(([d])=>d&&d!=='undefined').sort((a,b)=>b[1]-a[1])[0];
   if(topDir&&topDir[1]>1) datos.push(sabiaItem(`<strong>${esc(topDir[0])}</strong> es el director/a que más veces habéis visto — <strong>${topDir[1]} películas</strong>`));
 
-  // Persona más generosa históricamente
   const mediasH=D.miembros.map(m=>{
+    if(!m?.nombre) return null;
     const vv=D.votos.filter(v=>v.miembro_id===m.id);
     if(vv.length<5) return null;
     return {nombre:m.nombre,media:vv.reduce((a,b)=>a+b.nota,0)/vv.length};
-  }).filter(x=>x).sort((a,b)=>b.media-a.media);
+  }).filter(x=>x&&x.nombre&&!isNaN(x.media)).sort((a,b)=>b.media-a.media);
   if(mediasH.length) datos.push(sabiaItem(`<strong>${esc(mediasH[0].nombre)}</strong> es la persona más generosa del club con una media histórica de <strong>${mediasH[0].media.toFixed(2)}</strong>`));
   if(mediasH.length>1) datos.push(sabiaItem(`<strong>${esc(mediasH[mediasH.length-1].nombre)}</strong> es la persona más exigente del club con una media histórica de <strong>${mediasH[mediasH.length-1].media.toFixed(2)}</strong>`));
 
-  // Horas totales de cine
-  const totalMin=D.pelis.reduce((a,p)=>a+(p.duracion||0),0);
+  const totalMin=D.pelis.reduce((a,p)=>a+(p?.duracion||0),0);
   if(totalMin>0) datos.push(sabiaItem(`En total habéis visto <strong>${Math.floor(totalMin/60)} horas y ${totalMin%60} minutos</strong> de cine juntos`));
 
-  return datos;
+  // Pais mas visto historico
+  const paisCount={};
+  D.pelis.forEach(p=>{const pa=paisPrincipal(p);if(pa)paisCount[pa]=(paisCount[pa]||0)+1;});
+  const topPais=Object.entries(paisCount).filter(([p])=>p&&p!=='undefined').sort((a,b)=>b[1]-a[1])[0];
+  if(topPais) datos.push(sabiaItem(`<strong>${esc(traducirPais(topPais[0]))}</strong> es el país más visto en la historia del club con <strong>${topPais[1]} películas</strong>`));
+
+  // Media más alta de temporada
+  const tempMedias=TEMPORADAS.map(t=>{
+    const vv=D.votos.filter(v=>D.pelis.find(p=>p.id===v.pelicula_id&&p.temporada===t));
+    if(!vv.length) return null;
+    return {t,m:vv.reduce((a,b)=>a+b.nota,0)/vv.length};
+  }).filter(x=>x&&!isNaN(x.m)).sort((a,b)=>b.m-a.m);
+  if(tempMedias.length) datos.push(sabiaItem(`La temporada con mejor media del club fue <strong>${tempMedias[0].t}</strong> con un <strong>${tempMedias[0].m.toFixed(2)}</strong>`));
+
+  // Filter out any remaining undefined/null
+  return datos.filter(d=>d&&d.texto&&!d.texto.includes('undefined')&&!d.texto.includes('null'));
 }
 
-function mostrarSabia(datos, idx){
-  const card=document.getElementById('sabia-card');
-  if(!card||!datos.length) return;
-  const item=datos[idx%datos.length];
-  const inner=card.querySelector('.sabia-inner');
-  const posterEl=card.querySelector('.sabia-poster');
-  const textEl=card.querySelector('.sabia-text');
-  if(!inner||!posterEl||!textEl) return;
-
-  // Remove exit animation class and add enter
-  inner.classList.remove('sabia-fade-enter','sabia-fade-exit');
-  void inner.offsetWidth; // force reflow
-  inner.classList.add('sabia-fade-enter');
-
-  // Set poster
-  if(item.posterUrl){
-    posterEl.innerHTML=`<img src="${item.posterUrl}" alt="">`;
-    posterEl.style.display='block';
-  } else {
-    posterEl.style.display='none';
-  }
-  textEl.innerHTML=item.texto;
-}
-
-let sabiaIdx=0, sabiaData=[], sabiaTimer=null;
-function iniciarSabias(){
-  sabiaData=generarSabias();
-  if(!sabiaData.length) return;
-  sabiaData=sabiaData.sort(()=>Math.random()-.5);
-  mostrarSabia(sabiaData,0);
-  sabiaTimer=setInterval(()=>{
-    const inner=document.querySelector('#sabia-card .sabia-inner');
-    if(!inner) return;
-    inner.classList.remove('sabia-fade-enter');
-    inner.classList.add('sabia-fade-exit');
-    setTimeout(()=>{
-      sabiaIdx=(sabiaIdx+1)%sabiaData.length;
-      mostrarSabia(sabiaData,sabiaIdx);
-    },500);
-  },9000);
-}
 
 // ============ ESTADÍSTICAS COMPARATIVAS ============
 function renderComparativas(){
