@@ -1382,23 +1382,74 @@ document.getElementById('m-ok').addEventListener('click', async()=>{
 });
 
 // ============ ADMIN ============
-function makeCandRow(pelId, idx, titulo, propuestaPor){
+const candSearchTOs={};
+
+function makeCandRow(pelId, idx, titulo, propuestaPor, posterUrl){
   const row=document.createElement('div');
-  row.style.cssText='display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center';
-  const tIn=document.createElement('input'); tIn.placeholder='Título'; tIn.value=titulo||''; tIn.className='cand-titulo-'+pelId;
-  tIn.style.cssText='background:#111;border:1px solid var(--borde);color:var(--crema);font-family:var(--fb);font-size:12px;padding:7px 9px;border-radius:2px;outline:none;width:100%';
+  row.style.cssText='border:1px solid var(--borde);border-radius:3px;padding:10px;margin-bottom:8px';
+
+  // Preview + delete
+  const topRow=document.createElement('div'); topRow.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:8px';
+  const preview=document.createElement('div'); preview.style.cssText='display:flex;align-items:center;gap:8px;flex:1;min-width:0';
+  const posterDiv=document.createElement('div'); posterDiv.style.cssText='width:28px;height:42px;background:var(--gris2);border-radius:2px;flex-shrink:0;overflow:hidden';
+  if(posterUrl) posterDiv.innerHTML=`<img src="${posterUrl}" style="width:100%;height:100%;object-fit:cover">`;
+  const titleSpan=document.createElement('span'); titleSpan.style.cssText='font-family:var(--fd);font-size:13px;color:var(--crema);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+  titleSpan.textContent=titulo||'Sin película seleccionada';
+  preview.appendChild(posterDiv); preview.appendChild(titleSpan);
+  const delBtn=document.createElement('button'); delBtn.textContent='✕';
+  delBtn.style.cssText='background:none;border:1px solid rgba(200,56,42,.3);color:var(--rojo);font-size:12px;padding:4px 8px;border-radius:2px;cursor:pointer;flex-shrink:0';
+  delBtn.addEventListener('click',()=>row.remove());
+  topRow.appendChild(preview); topRow.appendChild(delBtn);
+  row.appendChild(topRow);
+
+  // Hidden data inputs
+  const tHidden=document.createElement('input'); tHidden.type='hidden'; tHidden.className='cand-titulo-'+pelId; tHidden.value=titulo||'';
+  const pHidden=document.createElement('input'); pHidden.type='hidden'; pHidden.className='cand-poster-'+pelId; pHidden.value=posterUrl||'';
+  row.appendChild(tHidden); row.appendChild(pHidden);
+
+  // TMDB search
+  const srchIn=document.createElement('input'); srchIn.placeholder='Buscar en TMDB...';
+  srchIn.style.cssText='width:100%;background:#0d0d0d;border:1px solid var(--borde);color:var(--crema);font-family:var(--fb);font-size:12px;padding:7px 9px;border-radius:2px;outline:none;margin-bottom:6px';
+  const srchRes=document.createElement('div'); srchRes.style.cssText='max-height:150px;overflow-y:auto;display:none;border:1px solid var(--borde);border-radius:2px;background:#111;margin-bottom:6px';
+  srchIn.addEventListener('input',()=>{
+    const q=srchIn.value.trim();
+    clearTimeout(candSearchTOs[pelId+'-'+idx]);
+    if(q.length<2){ srchRes.style.display='none'; return; }
+    candSearchTOs[pelId+'-'+idx]=setTimeout(async()=>{
+      const r=await fetch('https://api.themoviedb.org/3/search/movie?api_key='+TK+'&query='+encodeURIComponent(q)+'&language=es-ES');
+      const d=await r.json(); srchRes.innerHTML=''; srchRes.style.display='block';
+      if(!d.results?.length){ srchRes.innerHTML='<div style="font-family:var(--fm);font-size:11px;color:var(--gris);padding:6px">Sin resultados</div>'; return; }
+      d.results.slice(0,5).forEach(item=>{
+        const div=document.createElement('div');
+        div.style.cssText='display:flex;align-items:center;gap:8px;padding:7px;cursor:pointer;border-bottom:1px solid var(--borde)';
+        div.onmouseover=()=>div.style.background='rgba(240,234,216,.05)';
+        div.onmouseout=()=>div.style.background='';
+        const pUrl=item.poster_path?TI+item.poster_path:'';
+        div.innerHTML=(pUrl?'<img src="'+pUrl+'" style="width:24px;height:36px;object-fit:cover;border-radius:2px;flex-shrink:0">':'<div style="width:24px;height:36px;background:var(--gris2);border-radius:2px;flex-shrink:0"></div>')
+          +'<div><div style="font-family:var(--fd);font-size:12px;color:var(--crema)">'+item.title+'</div><div style="font-family:var(--fm);font-size:10px;color:var(--gris)">'+(item.release_date?item.release_date.substring(0,4):'')+'</div></div>';
+        div.addEventListener('click',()=>{
+          tHidden.value=item.title;
+          pHidden.value=pUrl;
+          titleSpan.textContent=item.title;
+          posterDiv.innerHTML=pUrl?'<img src="'+pUrl+'" style="width:100%;height:100%;object-fit:cover">':'';
+          srchRes.style.display='none'; srchIn.value='';
+        });
+        srchRes.appendChild(div);
+      });
+    },350);
+  });
+  row.appendChild(srchIn); row.appendChild(srchRes);
+
+  // Propuesto por
   const pSel=document.createElement('select'); pSel.className='cand-prop-'+pelId;
-  pSel.style.cssText='background:#111;border:1px solid var(--borde);color:var(--crema);font-family:var(--fb);font-size:12px;padding:7px 9px;border-radius:2px;outline:none;width:100%';
+  pSel.style.cssText='width:100%;background:#0d0d0d;border:1px solid var(--borde);color:var(--crema);font-family:var(--fb);font-size:12px;padding:7px 9px;border-radius:2px;outline:none';
   const emptyOpt=document.createElement('option'); emptyOpt.value=''; emptyOpt.textContent='Quién la propuso'; pSel.appendChild(emptyOpt);
   D.miembros.forEach(m=>{
     const o=document.createElement('option'); o.value=m.id; o.textContent=m.nombre;
     if(propuestaPor===m.id) o.selected=true;
     pSel.appendChild(o);
   });
-  const delBtn=document.createElement('button'); delBtn.textContent='✕';
-  delBtn.style.cssText='background:none;border:1px solid rgba(200,56,42,.3);color:var(--rojo);font-size:12px;padding:6px 9px;border-radius:2px;cursor:pointer;flex-shrink:0';
-  delBtn.addEventListener('click',()=>row.remove());
-  row.appendChild(tIn); row.appendChild(pSel); row.appendChild(delBtn);
+  row.appendChild(pSel);
   return row;
 }
 
@@ -1589,18 +1640,17 @@ function renderAdmin(){
     });
     editBox.appendChild(propSel);
 
-    // Asistencia checkboxes
-    const asLbl=document.createElement('label'); asLbl.className='form-lbl'; asLbl.style.marginTop='8px'; asLbl.textContent='Asistencia'; editBox.appendChild(asLbl);
-    const asGrid=document.createElement('div'); asGrid.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px';
+    // Asistencia multi-select
+    const asLbl=document.createElement('label'); asLbl.className='form-lbl'; asLbl.style.marginTop='8px'; asLbl.textContent='Asistencia (Ctrl/Cmd para selección múltiple)'; editBox.appendChild(asLbl);
     const asistActual=p.asistencia||[];
+    const asSel=document.createElement('select'); asSel.id='ef-asistencia-'+p.id; asSel.multiple=true;
+    asSel.style.cssText='width:100%;background:#111;border:1px solid var(--borde);color:var(--crema);font-family:var(--fb);font-size:13px;padding:4px;border-radius:2px;outline:none;margin-bottom:8px;min-height:90px';
     D.miembros.forEach(m=>{
-      const wrap=document.createElement('label'); wrap.style.cssText='display:flex;align-items:center;gap:6px;font-family:var(--fb);font-size:12px;cursor:pointer';
-      const cb=document.createElement('input'); cb.type='checkbox'; cb.dataset.mid=m.id; cb.className='asistencia-cb-'+p.id;
-      cb.checked=asistActual.includes(m.id); cb.style.accentColor='var(--rojo)';
-      wrap.appendChild(cb); wrap.appendChild(document.createTextNode(m.nombre));
-      asGrid.appendChild(wrap);
+      const o=document.createElement('option'); o.value=m.id; o.textContent=m.nombre;
+      if(asistActual.includes(m.id)) o.selected=true;
+      asSel.appendChild(o);
     });
-    editBox.appendChild(asGrid);
+    editBox.appendChild(asSel);
     // Invitados
     const invLbl=document.createElement('label'); invLbl.className='form-lbl'; invLbl.textContent='Invitados (separados por coma)'; editBox.appendChild(invLbl);
     const invInput=document.createElement('input'); invInput.id='ef-invitados-'+p.id; invInput.style.cssText='width:100%;background:#111;border:1px solid var(--borde);color:var(--crema);font-family:var(--fb);font-size:13px;padding:8px 10px;border-radius:2px;outline:none;margin-bottom:8px';
@@ -1613,7 +1663,7 @@ function renderAdmin(){
     const candContainer=document.createElement('div'); candContainer.id='cand-list-'+p.id;
     const candidatasActuales=p.candidatas||[];
     candidatasActuales.forEach((cand,ci)=>{
-      const row=makeCandRow(p.id, ci, cand.titulo||'', cand.propuesta_por||'');
+      const row=makeCandRow(p.id, ci, cand.titulo||'', cand.propuesta_por||'', cand.poster_url||'');
       candContainer.appendChild(row);
     });
     editBox.appendChild(candContainer);
@@ -1635,7 +1685,8 @@ function renderAdmin(){
         const propVal=document.getElementById('ef-prop-'+p.id)?.value||null;
         const posterVal=document.getElementById('ef-poster-'+p.id)?.value.trim()||null;
         const generoVal=document.getElementById('ef-genero-'+p.id)?.value.trim()||null;
-        const cbChecked=[...document.querySelectorAll('.asistencia-cb-'+p.id+':checked')].map(cb=>cb.dataset.mid);
+        const asSelEl=document.getElementById('ef-asistencia-'+p.id);
+        const cbChecked=asSelEl?[...asSelEl.selectedOptions].map(o=>o.value):[];
         const invText=document.getElementById('ef-invitados-'+p.id)?.value.trim()||'';
         const invitados=invText?invText.split(',').map(s=>'__'+s.trim()).filter(s=>s.length>2):[];
         const asistencia=[...cbChecked,...invitados];
@@ -1647,7 +1698,8 @@ function renderAdmin(){
         // Collect candidatas
         const candTitulos=[...document.querySelectorAll('.cand-titulo-'+p.id)];
         const candProps=[...document.querySelectorAll('.cand-prop-'+p.id)];
-        const candidatas=candTitulos.map((t,i)=>({titulo:t.value.trim(),propuesta_por:candProps[i]?.value||''})).filter(x=>x.titulo);
+        const candPosters=[...document.querySelectorAll('.cand-poster-'+p.id)];
+        const candidatas=candTitulos.map((t,i)=>({titulo:t.value.trim(),propuesta_por:candProps[i]?.value||'',poster_url:candPosters[i]?.value||''})).filter(x=>x.titulo);
         await dbPatch('peliculas',`id=eq.${p.id}`,{
           titulo:document.getElementById('ef-titulo-'+p.id).value.trim(),
           director:document.getElementById('ef-dir-'+p.id).value.trim()||null,
