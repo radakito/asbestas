@@ -214,6 +214,12 @@ textarea.com-area::placeholder{color:var(--gris)}
 .season-sel select{background:#1e1e1e;border:1px solid var(--borde);color:var(--crema);font-family:var(--fm);font-size:12px;padding:6px 10px;border-radius:2px;outline:none;cursor:pointer}
 .fab{position:fixed;bottom:24px;right:20px;background:var(--rojo);color:var(--crema);border:none;width:48px;height:48px;border-radius:50%;font-size:24px;cursor:pointer;z-index:50;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(200,56,42,.4)}
 .fab:hover{background:var(--rojo-h)}
+
+.info-btn{background:none;border:1px solid var(--borde);color:var(--gris);font-family:var(--fm);font-size:10px;padding:2px 7px;border-radius:2px;cursor:pointer;transition:all .15s;vertical-align:middle}
+.info-btn:hover{border-color:var(--crema2);color:var(--crema2)}
+.info-modal{position:fixed;inset:0;background:rgba(13,13,13,.93);z-index:300;display:flex;align-items:flex-end;justify-content:center;padding:20px}
+.info-panel{background:#161616;border:1px solid var(--borde);border-radius:4px;padding:24px;width:100%;max-width:440px;max-height:85vh;overflow-y:auto}
+.info-asistente{display:inline-block;font-family:var(--fb);font-size:12px;padding:3px 10px;border-radius:12px;background:rgba(240,234,216,.07);color:var(--crema2);margin:2px}
 </style>
 </head>
 <body>
@@ -335,6 +341,12 @@ textarea.com-area::placeholder{color:var(--gris)}
     <button class="btn-confirm off" id="fest-ok">Proponer esta película</button>
     <button class="btn-cancel" id="fest-cancel">Cancelar</button>
   </div>
+</div>
+
+
+<!-- MODAL INFO PELI -->
+<div class="info-modal" id="m-info" style="display:none" onclick="if(event.target===this)document.getElementById('m-info').style.display='none'">
+  <div class="info-panel" id="m-info-body"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -653,16 +665,36 @@ function renderInicio(){
 }
 
 // ============ RENDER VOTA ============
+let votaTemporada=null;
+function getVotaTemp(){ return votaTemporada||TEMPORADA; }
+
 function renderVota(){
   const el=document.getElementById('vota');
-  const pelisActualesV=D.pelis.filter(p=>p.temporada===TEMPORADA);
+  if(!votaTemporada) votaTemporada=TEMPORADA;
+  el.innerHTML='';
+  // Season selector
+  const sw=document.createElement('div'); sw.className='season-sel';
+  sw.innerHTML='<span>Temporada</span>';
+  const ss=document.createElement('select');
+  TEMPORADAS.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;if(t===votaTemporada)o.selected=true;ss.appendChild(o);});
+  ss.addEventListener('change',()=>{votaTemporada=ss.value;renderVota();});
+  sw.appendChild(ss); el.appendChild(sw);
+  const esPasada=votaTemporada!==TEMPORADA;
+  const pelisActualesV=D.pelis.filter(p=>p.temporada===votaTemporada);
   if(!pelisActualesV.length){ el.innerHTML='<div class="empty">No hay películas aún.</div>'; return; }
-  const ordered=[...pelisActualesV].reverse();
-  el.innerHTML=`<div class="sec-label">Temporada ${TEMPORADA} · ${pelisActualesV.length} película${pelisActualesV.length!==1?'s':''}</div><div class="h-list" id="vota-list"></div>`;
-  const list=document.getElementById('vota-list');
-  ordered.forEach(p=>{
+  if(!pelisActualesV.length){ const e=document.createElement('div');e.className='empty';e.textContent='No hay películas para esta temporada.';el.appendChild(e);return;}
+  const lbl=document.createElement('div');lbl.className='sec-label';
+  lbl.textContent='Temporada '+votaTemporada+' · '+pelisActualesV.length+' película'+(pelisActualesV.length!==1?'s':'')+(esPasada?' · solo lectura':'');
+  el.appendChild(lbl);
+  const list=document.createElement('div');list.className='h-list';el.appendChild(list);
+  [...pelisActualesV].reverse().forEach(p=>{
     const m=mediaP(p.id),vv=votosP(p.id),nc=comsP(p.id).length,num=D.pelis.indexOf(p)+1;
-    list.appendChild(makeHItem(num,p,m,vv.length,nc));
+    const item=makeHItem(num,p,m,vv.length,nc);
+    if(esPasada){
+      const btn=item.querySelector('[data-votar]');
+      if(btn){btn.disabled=true;btn.style.opacity='.4';btn.title='No se puede votar en temporadas pasadas';}
+    }
+    list.appendChild(item);
   });
 }
 
@@ -673,7 +705,7 @@ function makeHItem(num,p,media,nVotos,nComs){
     <div class="h-num">${num}</div>
     <div>
       <div class="h-title">${esc(p.titulo)}${estreno(p.anio)?'<span class="badge-estreno">estreno</span>':''}</div>
-      <div class="h-meta">${p.anio||''}${p.pais?' · '+esc(traducirPais(paisPrincipal(p)||p.pais)):''}${p.fecha_sesion?' · '+fmtFecha(p.fecha_sesion):''}${nComs?' · '+nComs+'💬':''}</div>
+      <div class="h-meta">${p.anio||''}${p.pais?' · '+esc(traducirPais(paisPrincipal(p)||p.pais)):''}${p.fecha_sesion?' · '+fmtFecha(p.fecha_sesion):''}${nComs?' · '+nComs+'💬':''} · <button class="info-btn" onclick="event.stopPropagation();showInfoPanel('${p.id}')">+ info</button></div>
     </div>
     <div class="h-nota">${rankingRevelado()?(media||'—'):'—'}<span>${nVotos} votos</span></div>`;
   div.addEventListener('click',()=>openDetalle(p.id));
@@ -2087,8 +2119,8 @@ function generarSabias(){
   D.votos.forEach(v=>{
     const p=D.pelis.find(x=>x.id===v.pelicula_id); if(!p) return;
     const nombre=nombreM(v.miembro_id); if(!nombre||nombre==='?') return;
-    if(v.nota===10) datos.push(sabiaItem(`<strong>${esc(nombre)}</strong> le puso un <strong style="color:var(--rojo)">10</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
-    if(v.nota<=2) datos.push(sabiaItem(`<strong>${esc(nombre)}</strong> le puso un <strong style="color:var(--gris)">${v.nota}</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
+    if(v.nota===10&&Math.random()<0.35) datos.push(sabiaItem(`<strong>${esc(nombre)}</strong> le puso un <strong style="color:var(--rojo)">10</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
+    if(v.nota===1&&Math.random()<0.35) datos.push(sabiaItem(`<strong>${esc(nombre)}</strong> le puso un <strong style="color:var(--gris)">${v.nota}</strong> a <em>${esc(p.titulo)}</em>${p.temporada!==TEMPORADA?' · '+p.temporada:''}`,p));
   });
 
   // Mayor discrepancia individual - safe
@@ -2098,7 +2130,7 @@ function generarSabias(){
     votosP(p.id).forEach(v=>{
       const diff=Math.abs(v.nota-mNum);
       const nombre=nombreM(v.miembro_id); if(!nombre||nombre==='?') return;
-      if(diff>=3) datos.push(sabiaItem(`<strong>${esc(nombre)}</strong> votó <em>${esc(p.titulo)}</em> con un <strong>${v.nota}</strong>, el grupo le puso un <strong>${mNum.toFixed(1)}</strong>`,p));
+      if(diff>=3&&Math.random()<0.3) datos.push(sabiaItem(`<strong>${esc(nombre)}</strong> votó <em>${esc(p.titulo)}</em> con un <strong>${v.nota}</strong>, el grupo le puso un <strong>${mNum.toFixed(1)}</strong>`,p));
     });
   });
 
@@ -2173,6 +2205,29 @@ function generarSabias(){
 
   const totalMin=D.pelis.reduce((a,p)=>a+(p?.duracion||0),0);
   if(totalMin>0) datos.push(sabiaItem(`En total habéis visto <strong>${Math.floor(totalMin/60)} horas y ${totalMin%60} minutos</strong> de cine juntos`));
+
+  // Género más visto
+  const genCount={};
+  D.pelis.forEach(p=>{if(p?.genero)p.genero.split(',').forEach(g=>{const t=g.trim();if(t&&t!=='undefined')genCount[t]=(genCount[t]||0)+1;});});
+  const topGenero=Object.entries(genCount).sort((a,b)=>b[1]-a[1])[0];
+  if(topGenero) datos.push(sabiaItem(`El género más visto en la historia del club es <strong>${esc(topGenero[0])}</strong> con <strong>${topGenero[1]} películas</strong>`));
+
+  // Total pelis y temporadas
+  const tempsConDatos=TEMPORADAS.filter(t=>D.pelis.some(p=>p.temporada===t));
+  datos.push(sabiaItem(`En total habéis visto <strong>${D.pelis.length} películas</strong> en <strong>${tempsConDatos.length} temporadas</strong>`));
+
+  // Mejor peli de cada temporada
+  tempsConDatos.forEach(t=>{
+    const pelT=D.pelis.filter(p=>p.temporada===t).map(p=>({...p,m:parseFloat(mediaP(p.id)),n:votosP(p.id).length})).filter(p=>p.m&&p.n>=3&&p.titulo).sort((a,b)=>b.m-a.m)[0];
+    if(pelT) datos.push(sabiaItem(`La mejor valorada de la temporada <strong>${t}</strong> fue <em>${esc(pelT.titulo)}</em> con un <strong>${pelT.m.toFixed(2)}</strong>`,pelT));
+  });
+
+  // Peor y mejor histórica
+  const todasConMedia=D.pelis.map(p=>({...p,m:parseFloat(mediaP(p.id)),n:votosP(p.id).length})).filter(p=>p.m&&p.n>=4&&p.titulo);
+  const worstAll=[...todasConMedia].sort((a,b)=>a.m-b.m)[0];
+  const bestAll=[...todasConMedia].sort((a,b)=>b.m-a.m)[0];
+  if(worstAll) datos.push(sabiaItem(`La película peor valorada de la historia del club es <em>${esc(worstAll.titulo)}</em> con un <strong>${worstAll.m.toFixed(2)}</strong>`,worstAll));
+  if(bestAll) datos.push(sabiaItem(`La película mejor valorada de la historia del club es <em>${esc(bestAll.titulo)}</em> con un <strong>${bestAll.m.toFixed(2)}</strong>`,bestAll));
 
   // Pais mas visto historico
   const paisCount={};
@@ -2446,6 +2501,60 @@ function renderComparativas(){
     });
     el.appendChild(mpDiv);
   }
+}
+
+
+function showInfoPanel(pelId){
+  const p=D.pelis.find(x=>x.id===pelId); if(!p) return;
+  const propM=p.propuesto_por?D.miembros.find(m=>m.id===p.propuesto_por):null;
+  const asist=p.asistencia||[];
+  const miembrosAsist=asist.filter(x=>!String(x).startsWith('__')).map(id=>nombreM(id)).filter(n=>n!=='?');
+  const invitados=asist.filter(x=>String(x).startsWith('__')).map(x=>x.replace('__',''));
+  const todos=[...miembrosAsist,...invitados];
+  const body=document.getElementById('m-info-body'); body.innerHTML='';
+
+  // Header
+  const hdr=document.createElement('div');
+  hdr.style.cssText='display:grid;grid-template-columns:80px 1fr;gap:16px;margin-bottom:20px;align-items:start';
+  hdr.innerHTML=`<div style="width:80px;height:120px;background:var(--gris2);border-radius:3px;overflow:hidden">${p.poster_url?`<img src="${esc(p.poster_url)}" style="width:100%;height:100%;object-fit:cover">`:''}</div>
+    <div>
+      <div style="font-family:var(--fd);font-size:18px;font-weight:700;color:var(--crema);margin-bottom:6px">${esc(p.titulo)}</div>
+      <div style="font-family:var(--fm);font-size:12px;color:var(--gris);line-height:2">
+        ${p.fecha_sesion?'📅 '+fmtFecha(p.fecha_sesion)+'<br>':''}
+        ${p.cine?'🎬 '+esc(p.cine)+'<br>':''}
+        ${p.lugar_tertulia?'🍷 '+esc(p.lugar_tertulia)+'<br>':''}
+        ${propM?'💡 Propuesta por <strong style="color:var(--crema)">'+esc(propM.nombre)+'</strong>':''}
+      </div>
+    </div>`;
+  body.appendChild(hdr);
+
+  if(todos.length){
+    const asDiv=document.createElement('div'); asDiv.style.marginBottom='16px';
+    asDiv.innerHTML=`<div style="font-family:var(--fm);font-size:10px;color:var(--gris);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Asistencia · ${todos.length} personas</div>`;
+    todos.forEach(n=>{asDiv.innerHTML+=`<span class="info-asistente">${esc(n)}</span>`;});
+    body.appendChild(asDiv);
+  }
+
+  if(p.candidatas&&p.candidatas.length){
+    const candDiv=document.createElement('div'); candDiv.style.marginBottom='16px';
+    candDiv.innerHTML=`<div style="font-family:var(--fm);font-size:10px;color:var(--gris);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Otras candidatas</div>`;
+    p.candidatas.forEach(cand=>{
+      if(!cand.titulo) return;
+      const propC=cand.propuesta_por?D.miembros.find(m=>m.id===cand.propuesta_por):null;
+      const ci=document.createElement('div'); ci.style.cssText='display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--borde)';
+      ci.innerHTML=(cand.poster_url?`<img src="${esc(cand.poster_url)}" style="width:28px;height:42px;object-fit:cover;border-radius:2px;flex-shrink:0">`:'<div style="width:28px;height:42px;background:var(--gris2);border-radius:2px;flex-shrink:0"></div>')
+        +`<div><div style="font-family:var(--fd);font-size:13px;color:var(--crema)">${esc(cand.titulo)}</div>${propC?`<div style="font-family:var(--fm);font-size:10px;color:var(--gris)">${esc(propC.nombre)}</div>`:''}</div>`;
+      candDiv.appendChild(ci);
+    });
+    body.appendChild(candDiv);
+  }
+
+  const closeBtn=document.createElement('button');
+  closeBtn.style.cssText='width:100%;background:none;border:1px solid var(--borde);color:var(--gris);font-family:var(--fm);font-size:12px;padding:10px;border-radius:2px;cursor:pointer;margin-top:8px';
+  closeBtn.textContent='Cerrar';
+  closeBtn.addEventListener('click',()=>document.getElementById('m-info').style.display='none');
+  body.appendChild(closeBtn);
+  document.getElementById('m-info').style.display='flex';
 }
 
 // ============ INIT ============
