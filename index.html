@@ -681,7 +681,6 @@ function renderVota(){
   sw.appendChild(ss); el.appendChild(sw);
   const esPasada=votaTemporada!==TEMPORADA;
   const pelisActualesV=D.pelis.filter(p=>p.temporada===votaTemporada);
-  if(!pelisActualesV.length){ el.innerHTML='<div class="empty">No hay películas aún.</div>'; return; }
   if(!pelisActualesV.length){ const e=document.createElement('div');e.className='empty';e.textContent='No hay películas para esta temporada.';el.appendChild(e);return;}
   const lbl=document.createElement('div');lbl.className='sec-label';
   lbl.textContent='Temporada '+votaTemporada+' · '+pelisActualesV.length+' película'+(pelisActualesV.length!==1?'s':'')+(esPasada?' · solo lectura':'');
@@ -897,8 +896,15 @@ function renderEstadisticas(){
     // 1. Pelis vistas por miembro (asistencia)
     const asistencia={};
     D.miembros.forEach(m=>asistencia[m.id]=0);
-    D.votos.forEach(v=>{ if(asistencia[v.miembro_id]!==undefined) asistencia[v.miembro_id]++; });
-    const asisOrd=Object.entries(asistencia).map(([id,n])=>[nombreM(id),n]).sort((a,b)=>b[1]-a[1]);
+    // Use asistencia field from peliculas; fallback to votos
+    D.pelis.filter(p=>p.temporada===(typeof _pelisBak!=='undefined'?_pelisBak:D.pelis)[0]?.temporada||true).forEach(p=>{
+      if(p.asistencia&&p.asistencia.length){
+        p.asistencia.forEach(id=>{if(typeof id==='string'&&!id.startsWith('__')&&asistencia[id]!==undefined)asistencia[id]++;});
+      } else {
+        votosP(p.id).forEach(v=>{if(asistencia[v.miembro_id]!==undefined)asistencia[v.miembro_id]++;});
+      }
+    });
+    const asisOrd=Object.entries(asistencia).map(([id,n])=>[nombreM(id),n]).filter(([n])=>n!=='?').sort((a,b)=>b[1]-a[1]);
     if(asisOrd.length){
       const maxA=asisOrd[0]?.[1]||1;
       const sec1=document.createElement('div'); sec1.style.marginBottom='24px';
@@ -2470,10 +2476,25 @@ function renderComparativas(){
     el.appendChild(afDiv);
   }
 
-  // ---- ASISTENCIA HISTÓRICA ----
+  // ---- ASISTENCIA HISTÓRICA (from asistencia field in peliculas) ----
   const asisAll={};
   D.miembros.forEach(m=>asisAll[m.id]={nombre:m.nombre,n:0});
-  D.votos.forEach(v=>{ if(asisAll[v.miembro_id]) asisAll[v.miembro_id].n++; });
+  // Count from asistencia field
+  D.pelis.forEach(p=>{
+    (p.asistencia||[]).forEach(id=>{
+      if(typeof id==='string'&&!id.startsWith('__')&&asisAll[id]){
+        asisAll[id].n++;
+      }
+    });
+  });
+  // Fallback: also count from votos for pelis without asistencia field
+  D.pelis.forEach(p=>{
+    if(!p.asistencia||!p.asistencia.length){
+      votosP(p.id).forEach(v=>{
+        if(asisAll[v.miembro_id]) asisAll[v.miembro_id].n++;
+      });
+    }
+  });
   const asisOrd=Object.values(asisAll).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
   if(asisOrd.length){
     const asDiv=document.createElement('div'); asDiv.style.marginBottom='28px';
