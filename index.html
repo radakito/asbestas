@@ -408,7 +408,7 @@ async function dbDel(tabla, qs){
 async function loadAll(){
   const [m, p, v, c, tv, cv, fp, fv, fc, rc] = await Promise.all([
     dbGet('miembros','activo=eq.true&order=nombre.asc'),
-    dbGet('peliculas','order=fecha_sesion.asc.nullslast,creado_en.asc'),
+    dbGet('peliculas','order=temporada.asc.nullslast,numero_sesion.asc.nullslast,fecha_sesion.asc.nullslast,creado_en.asc'),
     dbGet('votos','select=*'),
     dbGet('comentarios','select=*&order=creado_en.asc').catch(()=>[]),
     dbGet('tertulia_votos','select=*').catch(()=>[]),
